@@ -56,6 +56,130 @@ export const MOTION_TYPES: {
   fields: MotionField[];
 }[] = [
   {
+    id: "set_agenda",
+    label: "Motion to Set the Agenda",
+    rule: 5,
+    disruptivity: 20,
+    fields: [{ key: "topic", label: "Agenda topic", type: "text" }],
+  },
+  {
+    id: "open_debate",
+    label: "Motion to Open Debate",
+    rule: 6,
+    disruptivity: 30,
+    fields: [],
+  },
+  {
+    id: "moderated_caucus",
+    label: "Motion for Moderated Caucus",
+    rule: 7,
+    disruptivity: 60,
+    fields: [
+      { key: "duration", label: "Duration (min)", type: "text" },
+      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
+      { key: "topic", label: "Topic", type: "text" },
+      {
+        key: "speak_order",
+        label: "Reserve first/last?",
+        type: "select",
+        options: [
+          { value: "", label: "None" },
+          { value: "first", label: "Speak first" },
+          { value: "last", label: "Speak last" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "unmoderated_caucus",
+    label: "Motion for Unmoderated Caucus",
+    rule: 8,
+    disruptivity: 55,
+    fields: [{ key: "duration", label: "Duration (min)", type: "text" }],
+  },
+  {
+    id: "round_robin",
+    label: "Motion for Round Robin",
+    rule: 9,
+    disruptivity: 50,
+    fields: [
+      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
+      { key: "topic", label: "Topic", type: "text" },
+      { key: "order", label: "Speaking order", type: "text" },
+    ],
+  },
+  {
+    id: "gentlemans_caucus",
+    label: "Motion for Gentleman's Unmoderated Caucus",
+    rule: 10,
+    disruptivity: 54,
+    fields: [
+      { key: "duration", label: "Duration (min)", type: "text" },
+      { key: "topic", label: "Topic (optional)", type: "text" },
+    ],
+  },
+  {
+    id: "open_speakers_list",
+    label: "Motion to Open General Speakers List",
+    rule: 11,
+    disruptivity: 40,
+    fields: [
+      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
+    ],
+  },
+  {
+    id: "present_draft",
+    label: "Motion to Present Draft Resolutions",
+    rule: 16,
+    disruptivity: 75,
+    fields: [
+      { key: "reading_period", label: "Reading period (min)", type: "text" },
+      { key: "presentation_period", label: "Presentation period (min)", type: "text" },
+      { key: "qa_period", label: "Q&A period (min)", type: "text" },
+    ],
+  },
+  {
+    id: "amend",
+    label: "Motion to Amend",
+    rule: 17,
+    disruptivity: 80,
+    fields: [
+      {
+        key: "resolution",
+        label: "Draft resolution",
+        type: "document_select",
+      },
+      { key: "clause", label: "Clause to amend", type: "text" },
+      { key: "language", label: "Proposed language", type: "textarea" },
+      {
+        key: "amendment_type",
+        label: "Friendly or unfriendly",
+        type: "select",
+        options: [
+          { value: "friendly", label: "Friendly" },
+          { value: "unfriendly", label: "Unfriendly" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "division_question",
+    label: "Motion for Division of the Question",
+    rule: 18,
+    disruptivity: 85,
+    fields: [
+      { key: "target", label: "Resolution/amendment", type: "text" },
+      { key: "parts", label: "Parts to divide", type: "text" },
+    ],
+  },
+  {
+    id: "suspend_debate",
+    label: "Motion to Suspend Debate",
+    rule: 19,
+    disruptivity: 90,
+    fields: [],
+  },
+  {
     id: "close_debate",
     label: "Motion to Close Debate",
     rule: 20,
@@ -96,130 +220,6 @@ export const MOTION_TYPES: {
       { key: "paper_order", label: "Order of papers to vote", type: "text" },
       { key: "vote_manner", label: "Voting manner", type: "select" },
     ],
-  },
-  {
-    id: "suspend_debate",
-    label: "Motion to Suspend Debate",
-    rule: 19,
-    disruptivity: 90,
-    fields: [],
-  },
-  {
-    id: "division_question",
-    label: "Motion for Division of the Question",
-    rule: 18,
-    disruptivity: 85,
-    fields: [
-      { key: "target", label: "Resolution/amendment", type: "text" },
-      { key: "parts", label: "Parts to divide", type: "text" },
-    ],
-  },
-  {
-    id: "amend",
-    label: "Motion to Amend",
-    rule: 17,
-    disruptivity: 80,
-    fields: [
-      {
-        key: "resolution",
-        label: "Draft resolution",
-        type: "document_select",
-      },
-      { key: "clause", label: "Clause to amend", type: "text" },
-      { key: "language", label: "Proposed language", type: "textarea" },
-      {
-        key: "amendment_type",
-        label: "Friendly or unfriendly",
-        type: "select",
-        options: [
-          { value: "friendly", label: "Friendly" },
-          { value: "unfriendly", label: "Unfriendly" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "present_draft",
-    label: "Motion to Present Draft Resolutions",
-    rule: 16,
-    disruptivity: 75,
-    fields: [
-      { key: "reading_period", label: "Reading period (min)", type: "text" },
-      { key: "presentation_period", label: "Presentation period (min)", type: "text" },
-      { key: "qa_period", label: "Q&A period (min)", type: "text" },
-    ],
-  },
-  {
-    id: "moderated_caucus",
-    label: "Motion for Moderated Caucus",
-    rule: 7,
-    disruptivity: 60,
-    fields: [
-      { key: "duration", label: "Duration (min)", type: "text" },
-      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
-      { key: "topic", label: "Topic", type: "text" },
-      {
-        key: "speak_order",
-        label: "Reserve first/last?",
-        type: "select",
-        options: [
-          { value: "", label: "None" },
-          { value: "first", label: "Speak first" },
-          { value: "last", label: "Speak last" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "unmoderated_caucus",
-    label: "Motion for Unmoderated Caucus",
-    rule: 8,
-    disruptivity: 55,
-    fields: [{ key: "duration", label: "Duration (min)", type: "text" }],
-  },
-  {
-    id: "gentlemans_caucus",
-    label: "Motion for Gentleman's Unmoderated Caucus",
-    rule: 10,
-    disruptivity: 54,
-    fields: [
-      { key: "duration", label: "Duration (min)", type: "text" },
-      { key: "topic", label: "Topic (optional)", type: "text" },
-    ],
-  },
-  {
-    id: "round_robin",
-    label: "Motion for Round Robin",
-    rule: 9,
-    disruptivity: 50,
-    fields: [
-      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
-      { key: "topic", label: "Topic", type: "text" },
-      { key: "order", label: "Speaking order", type: "text" },
-    ],
-  },
-  {
-    id: "open_speakers_list",
-    label: "Motion to Open General Speakers List",
-    rule: 11,
-    disruptivity: 40,
-    fields: [
-      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
-    ],
-  },
-  {
-    id: "open_debate",
-    label: "Motion to Open Debate",
-    rule: 6,
-    disruptivity: 30,
-    fields: [],
-  },
-  {
-    id: "set_agenda",
-    label: "Motion to Set the Agenda",
-    rule: 5,
-    disruptivity: 20,
-    fields: [{ key: "topic", label: "Agenda topic", type: "text" }],
   },
 ];
 

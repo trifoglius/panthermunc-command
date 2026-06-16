@@ -251,9 +251,10 @@ export default function SettingsPage() {
 
         <Card title="Delete Conference">
           <p className="mb-3 text-sm text-red-700">
-            Permanently delete this conference and all data. This cannot be
+            Permanently delete this conference and all data. This <strong>cannot</strong> be undone.
             undone.
           </p>
+          <p className="mb-3 text-sm text-red-700">It is <strong>highly</strong> recommended to export all data before deleting the conference.</p>
           {!showDelete ? (
             <Button variant="danger" onClick={() => setShowDelete(true)}>
               Delete Conference
