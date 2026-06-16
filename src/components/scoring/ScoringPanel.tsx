@@ -40,7 +40,7 @@ export function ScoringPanel() {
 
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <Select
-            label="Your Role"
+            label="Role"
             value={role}
             onChange={(e) => setRole(e.target.value as ScorerRole)}
             options={[
@@ -69,12 +69,6 @@ export function ScoringPanel() {
           <Badge color="green">
             {role === "judge" ? "Judge" : "Dais"} scores signed
           </Badge>
-        )}
-        {!otherSigned && (
-          <p className="mt-2 text-sm text-purple-600">
-            The other scorer&apos;s scoresheet is hidden from this view per
-            AP.1.4.
-          </p>
         )}
       </Card>
 
@@ -152,6 +146,26 @@ export function ScoringPanel() {
         </div>
       </Card>
 
+      <Card title="Verbal Commendation (AP.2.8)">
+        <p className="mb-3 text-sm text-purple-700">
+          The verbal commendation is chosen by the Chair and cannot go to a best-in-committee award recipient.
+        </p>
+        <Select
+          label="VC Recipient"
+          value={activeCommittee.vcRecipientId ?? ""}
+          onChange={(e) =>
+            setVcRecipient(e.target.value || undefined)
+          }
+          options={[
+            { value: "", label: "Not selected" },
+            ...activeCommittee.delegates.map((d) => ({
+              value: d.id,
+              label: d.country,
+            })),
+          ]}
+        />
+      </Card>
+
       {activeCommittee.type !== "crisis" && (
         <Card title="Position Paper Scores (AP.3)">
           <div className="overflow-x-auto">
@@ -212,26 +226,6 @@ export function ScoringPanel() {
           </div>
         </Card>
       )}
-
-      <Card title="Verbal Commendation (AP.2.8)">
-        <p className="mb-3 text-sm text-purple-700">
-          VC is chosen by the Chair and cannot go to a BICA recipient.
-        </p>
-        <Select
-          label="VC Recipient"
-          value={activeCommittee.vcRecipientId ?? ""}
-          onChange={(e) =>
-            setVcRecipient(e.target.value || undefined)
-          }
-          options={[
-            { value: "", label: "Not selected" },
-            ...activeCommittee.delegates.map((d) => ({
-              value: d.id,
-              label: d.country,
-            })),
-          ]}
-        />
-      </Card>
     </div>
   );
 }
