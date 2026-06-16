@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { MotionActiveSession } from "@/components/motions/MotionActiveSession";
 import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
+import { computeMotionDisruptivity } from "@/lib/motion-disruptivity";
 import { getTimerConfig, motionHasTimer } from "@/lib/motion-timers";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
@@ -35,7 +36,11 @@ export function MotionPanel() {
       type: selectedMotion.label,
       proposedBy,
       status: "pending",
-      disruptivity: selectedMotion.disruptivity,
+      disruptivity: computeMotionDisruptivity(
+        selectedMotion.id,
+        selectedMotion.disruptivity,
+        details
+      ),
       details,
       notes,
     });

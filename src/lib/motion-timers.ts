@@ -6,6 +6,7 @@ export interface MotionTimerConfig {
   speakingSeconds?: number;
   phases?: { label: string; seconds: number }[];
   hasSpeakerQueue: boolean;
+  queueMode?: "single" | "for_against";
   speakingEventType: string;
 }
 
@@ -66,11 +67,16 @@ export function getTimerConfig(motion: Motion): MotionTimerConfig | null {
     }
     case "enter_voting":
       if (d.two_for_two_against !== "yes") return null;
-      return {
-        speakingSeconds: parseSeconds(d.speaking_time) || 120,
-        hasSpeakerQueue: true,
-        speakingEventType: "voting_procedure",
-      };
+      {
+        const speakingSeconds = parseSeconds(d.speaking_time) || 120;
+        return {
+          totalSeconds: speakingSeconds * 4,
+          speakingSeconds,
+          hasSpeakerQueue: true,
+          queueMode: "for_against",
+          speakingEventType: "voting_procedure",
+        };
+      }
     default:
       return null;
   }
@@ -109,4 +115,17 @@ export function isFormalSpeakingMotion(motion: Motion): boolean {
 
 export function motionHasTimer(motion: Motion): boolean {
   return getTimerConfig(motion) !== null;
+}
+
+export function buildVotingSpeakerQueue(
+  speakersFor: string[],
+  speakersAgainst: string[]
+): string[] {
+  const max = Math.max(speakersFor.length, speakersAgainst.length);
+  const result: string[] = [];
+  for (let i = 0; i < max; i++) {
+    if (speakersFor[i]) result.push(speakersFor[i]);
+    if (speakersAgainst[i]) result.push(speakersAgainst[i]);
+  }
+  return result;
 }

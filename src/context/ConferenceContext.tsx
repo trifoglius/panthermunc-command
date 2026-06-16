@@ -34,7 +34,7 @@ import type {
   SpeakingEvent,
 } from "@/lib/types";
 import type { CommitteeData } from "@/db/schema";
-import { isFormalSpeakingMotion } from "@/lib/motion-timers";
+import { isFormalSpeakingMotion, getMotionTypeId } from "@/lib/motion-timers";
 
 // ---------------------------------------------------------------------------
 // Data shape helpers
@@ -153,6 +153,11 @@ interface ConferenceContextValue {
   addMotion: (motion: Omit<Motion, "id" | "timestamp">) => void;
   updateMotion: (motion: Motion) => void;
   setMotionSpeakerQueue: (motionId: string, queue: string[]) => void;
+  setMotionVotingSpeakers: (
+    motionId: string,
+    speakersFor: string[],
+    speakersAgainst: string[]
+  ) => void;
   archiveMotionQueue: (passedMotionId: string) => void;
   addDocument: (doc: Omit<Document, "id" | "amendments">) => void;
   updateDocument: (doc: Document) => void;
@@ -384,12 +389,39 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------------------------
 
   const initConference = async (name: string, year: number) => {
-    await fetch("/api/conference", {
+    // First try to update an existing conference
+    const payload = { name, year };
+    let r = await fetch("/api/conference", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, year }),
+      body: JSON.stringify(payload),
     });
-    setConference((prev) => (prev ? { ...prev, name, year } : prev));
+
+    // If no conference exists yet (e.g. after deletion), fall back to create
+    if (!r.ok) {
+      r = await fetch("/api/conference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    if (!r.ok) {
+      setSyncError("Failed to initialize conference. Please try again.");
+      return;
+    }
+
+    const data = await r.json();
+    const next: Conference = {
+      id: data.id,
+      name: data.name,
+      year: data.year,
+      committees: (data.committees ?? []).map(emptyCommitteeStub),
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+    setConference(next);
+    conferenceRef.current = next;
   };
 
   const updateConference = async (updates: { name?: string; year?: number }) => {
@@ -467,6 +499,8 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
 
   const deleteConference = async () => {
     await fetch("/api/conference", { method: "DELETE" });
+    // Deleting a conference cascades to users; clear the session immediately
+    await fetch("/api/auth/logout", { method: "POST" });
     setConference(null);
     setActiveCommitteeId(null);
     conferenceRef.current = null;
@@ -581,7 +615,29 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       ...c,
       motionSessionState: {
         ...(c.motionSessionState ?? {}),
-        [motionId]: { speakerQueue: queue },
+        [motionId]: {
+          ...(c.motionSessionState?.[motionId] ?? {}),
+          speakerQueue: queue,
+        },
+      },
+    }));
+  };
+
+  const setMotionVotingSpeakers = (
+    motionId: string,
+    speakersFor: string[],
+    speakersAgainst: string[]
+  ) => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => ({
+      ...c,
+      motionSessionState: {
+        ...(c.motionSessionState ?? {}),
+        [motionId]: {
+          ...(c.motionSessionState?.[motionId] ?? {}),
+          speakersFor,
+          speakersAgainst,
+        },
       },
     }));
   };
@@ -592,9 +648,21 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       const passedMotion =
         c.motions.find((m) => m.id === passedMotionId) ?? null;
       const sessionState = c.motionSessionState ?? {};
+      const motionState = sessionState[passedMotionId];
+      const isVotingForAgainst =
+        passedMotion &&
+        getMotionTypeId(passedMotion) === "enter_voting" &&
+        passedMotion.details.two_for_two_against === "yes";
       const speakerQueue =
-        passedMotion && isFormalSpeakingMotion(passedMotion)
-          ? sessionState[passedMotionId]?.speakerQueue
+        passedMotion && isFormalSpeakingMotion(passedMotion) && !isVotingForAgainst
+          ? motionState?.speakerQueue
+          : undefined;
+      const votingSpeakers =
+        passedMotion && isVotingForAgainst
+          ? {
+              for: motionState?.speakersFor ?? [],
+              against: motionState?.speakersAgainst ?? [],
+            }
           : undefined;
 
       const snapshot: MotionQueueSnapshot = {
@@ -607,6 +675,11 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         motions: [...c.motions],
         speakerQueue:
           speakerQueue && speakerQueue.length > 0 ? speakerQueue : undefined,
+        votingSpeakers:
+          votingSpeakers &&
+          (votingSpeakers.for.length > 0 || votingSpeakers.against.length > 0)
+            ? votingSpeakers
+            : undefined,
       };
 
       const archivedIds = new Set(c.motions.map((m) => m.id));
@@ -863,6 +936,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         addMotion,
         updateMotion,
         setMotionSpeakerQueue,
+        setMotionVotingSpeakers,
         archiveMotionQueue,
         addDocument,
         updateDocument,

@@ -13,6 +13,7 @@ import type {
   RollCallSession,
   Motion,
   MotionQueueSnapshot,
+  MotionSessionState,
   Document,
   SpeakingEvent,
   Point,
@@ -28,7 +29,7 @@ export interface CommitteeData {
   rollCalls: RollCallSession[];
   motions: Motion[];
   motionQueueHistory: MotionQueueSnapshot[];
-  motionSessionState: Record<string, { speakerQueue: string[] }>;
+  motionSessionState: Record<string, MotionSessionState>;
   documents: Document[];
   speakingEvents: SpeakingEvent[];
   points: Point[];

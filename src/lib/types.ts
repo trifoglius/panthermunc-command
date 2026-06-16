@@ -99,6 +99,12 @@ export interface PositionPaperScore {
   notes: string;
 }
 
+export interface MotionSessionState {
+  speakerQueue?: string[];
+  speakersFor?: string[];
+  speakersAgainst?: string[];
+}
+
 export interface MotionQueueSnapshot {
   id: string;
   label: string;
@@ -106,6 +112,7 @@ export interface MotionQueueSnapshot {
   passedMotion: Motion | null;
   motions: Motion[];
   speakerQueue?: string[];
+  votingSpeakers?: { for: string[]; against: string[] };
 }
 
 export interface Committee {
@@ -117,7 +124,7 @@ export interface Committee {
   rollCalls: RollCallSession[];
   motions: Motion[];
   motionQueueHistory?: MotionQueueSnapshot[];
-  motionSessionState?: Record<string, { speakerQueue: string[] }>;
+  motionSessionState?: Record<string, MotionSessionState>;
   documents: Document[];
   speakingEvents: SpeakingEvent[];
   points: Point[];

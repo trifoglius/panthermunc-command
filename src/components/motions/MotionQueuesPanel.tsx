@@ -81,6 +81,37 @@ function SnapshotCard({
         </div>
       )}
 
+      {snapshot.votingSpeakers &&
+        (snapshot.votingSpeakers.for.length > 0 ||
+          snapshot.votingSpeakers.against.length > 0) && (
+          <div className="mb-4 grid gap-3 md:grid-cols-2">
+            {snapshot.votingSpeakers.for.length > 0 && (
+              <div className="rounded-md border border-green-200 bg-green-50 p-3">
+                <p className="mb-2 text-sm font-medium text-green-900">
+                  Speakers For
+                </p>
+                <ol className="list-decimal pl-5 text-sm text-green-800">
+                  {snapshot.votingSpeakers.for.map((id, i) => (
+                    <li key={`for-${id}-${i}`}>{countryName(id)}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {snapshot.votingSpeakers.against.length > 0 && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                <p className="mb-2 text-sm font-medium text-red-900">
+                  Speakers Against
+                </p>
+                <ol className="list-decimal pl-5 text-sm text-red-800">
+                  {snapshot.votingSpeakers.against.map((id, i) => (
+                    <li key={`against-${id}-${i}`}>{countryName(id)}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
+        )}
+
       {snapshot.speakerQueue && snapshot.speakerQueue.length > 0 && (
         <div className="mb-4 rounded-md border border-purple-200 bg-purple-50 p-3">
           <p className="mb-2 text-sm font-medium text-purple-900">
