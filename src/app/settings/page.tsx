@@ -3,10 +3,78 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
-import { Button, Card, Input } from "@/components/ui";
+import { Badge, Button, Card, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { exportConferenceLogs } from "@/lib/conference-logs-export";
+import type { Committee } from "@/lib/types";
+
+function committeeStats(c: Committee) {
+  const latestRollCall = c.rollCalls[0] ?? null;
+  const presentCount = latestRollCall
+    ? Object.values(latestRollCall.attendance).filter(
+        (s) => s === "present" || s === "present_voting"
+      ).length
+    : null;
+
+  const passedMotions = c.motions.filter((m) => m.status === "passed");
+  const lastPassedMotion = passedMotions[0] ?? null;
+
+  const adoptedResolutions = c.documents.filter(
+    (d) => d.type === "draft_resolution" && d.status === "adopted"
+  ).length;
+
+  return { presentCount, passedMotions: passedMotions.length, lastPassedMotion, adoptedResolutions };
+}
+
+function ConferenceStatsCard({ committees }: { committees: Committee[] }) {
+  if (committees.length === 0) return null;
+  return (
+    <Card title="Conference Statistics">
+      <div className="space-y-4">
+        {committees.map((c) => {
+          const { presentCount, passedMotions, lastPassedMotion, adoptedResolutions } =
+            committeeStats(c);
+          return (
+            <div
+              key={c.id}
+              className="rounded-lg border border-purple-100 bg-white p-4"
+            >
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-purple-900">{c.name}</p>
+                <Badge color="purple">{c.type.toUpperCase()}</Badge>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                <div className="rounded-md bg-purple-50 px-3 py-2">
+                  <p className="text-xs text-purple-600">Delegates Present</p>
+                  <p className="font-bold text-purple-900">
+                    {presentCount !== null
+                      ? `${presentCount} / ${c.delegates.length}`
+                      : "No roll call"}
+                  </p>
+                </div>
+                <div className="rounded-md bg-purple-50 px-3 py-2">
+                  <p className="text-xs text-purple-600">Passed Motions</p>
+                  <p className="font-bold text-purple-900">{passedMotions}</p>
+                </div>
+                <div className="rounded-md bg-purple-50 px-3 py-2">
+                  <p className="text-xs text-purple-600">Adopted Resolutions</p>
+                  <p className="font-bold text-purple-900">{adoptedResolutions}</p>
+                </div>
+                <div className="rounded-md bg-purple-50 px-3 py-2">
+                  <p className="text-xs text-purple-600">Last Passed Motion</p>
+                  <p className="font-bold text-purple-900 truncate">
+                    {lastPassedMotion ? lastPassedMotion.type : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -165,6 +233,8 @@ export default function SettingsPage() {
             </ul>
           )}
         </Card>
+
+        <ConferenceStatsCard committees={conference.committees} />
 
         <Card title="Export Logs">
           <p className="mb-3 text-sm text-purple-700">

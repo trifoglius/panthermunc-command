@@ -136,8 +136,8 @@ function TimerDisplay({
           hint={
             hasTotal
               ? config.queueMode === "for_against"
-                ? "Speaking time also depletes total time (4× speaking time)."
-                : "Speaking time also depletes total time."
+                ? "Speaking time depletes total time."
+                : "Speaking time depletes total time."
               : undefined
           }
         />
@@ -270,13 +270,14 @@ function SpeakerQueue({
   if (!activeCommittee) return null;
 
   const speakingSeconds = timers.speakingInitial;
+  const pendingIds = queue.slice(currentIndex);
   const available = activeCommittee.delegates.filter(
-    (d) => !queue.includes(d.id)
+    (d) => !pendingIds.includes(d.id)
   );
   const currentSpeakerId = queue[currentIndex];
 
   const addSpeaker = () => {
-    if (!addId || queue.includes(addId)) return;
+    if (!addId || pendingIds.includes(addId)) return;
     updateQueue(
       addSpeakerWithReserve(
         queue,

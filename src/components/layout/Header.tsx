@@ -18,7 +18,43 @@ export function Header() {
   const [topic, setTopic] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // Notification state (admin only)
+  const [showNotify, setShowNotify] = useState(false);
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [notifyTarget, setNotifyTarget] = useState<string>("all");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<string | null>(null);
+
   const isAdmin = user?.role === "admin";
+
+  const handleSendNotification = async () => {
+    if (!notifyMessage.trim()) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const committeeIds =
+        notifyTarget === "all"
+          ? null
+          : [notifyTarget];
+      const res = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: notifyMessage.trim(), committeeIds }),
+      });
+      if (res.ok) {
+        setSendResult("Sent!");
+        setNotifyMessage("");
+        setNotifyTarget("all");
+        setTimeout(() => setSendResult(null), 3000);
+      } else {
+        setSendResult("Failed to send.");
+      }
+    } catch {
+      setSendResult("Failed to send.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   const handleAddCommittee = async () => {
     if (!name.trim()) return;
@@ -37,7 +73,7 @@ export function Header() {
     <header className="border-b border-purple-200 bg-purple-800 text-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
         <div>
-          <h1 className="text-xl font-bold">PantherMUNC Command</h1>
+          <h1 className="text-xl font-bold">PantherMUNC Conference Management System</h1>
           <p className="text-sm text-purple-200">
             {conference
               ? `${conference.name} ${conference.year}`
@@ -89,6 +125,19 @@ export function Header() {
                 </Button>
               ) : null}
               {isAdmin && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setShowNotify(!showNotify);
+                    setShowAdd(false);
+                  }}
+                  className="!border-white/30 !text-purple-900"
+                >
+                  Notify
+                </Button>
+              )}
+              {isAdmin && (
                 <Link href="/settings">
                   <Button
                     variant="secondary"
@@ -132,6 +181,56 @@ export function Header() {
           )}
         </div>
       </div>
+      {showNotify && isAdmin && conference && (
+        <div className="border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
+          <div className="mx-auto max-w-3xl">
+            <Card title="Send Notification to Chairs">
+              <div className="grid gap-3 md:grid-cols-3">
+                <Select
+                  label="Send to"
+                  value={notifyTarget}
+                  onChange={(e) => setNotifyTarget(e.target.value)}
+                  options={[
+                    { value: "all", label: "All committees" },
+                    ...conference.committees.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    })),
+                  ]}
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="Message"
+                    value={notifyMessage}
+                    onChange={(e) => setNotifyMessage(e.target.value)}
+                    placeholder="Type a message for chairs..."
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <Button
+                  onClick={handleSendNotification}
+                  disabled={sending || !notifyMessage.trim()}
+                >
+                  {sending ? "Sending…" : "Send Notification"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowNotify(false)}
+                >
+                  Cancel
+                </Button>
+                {sendResult && (
+                  <span className="text-sm font-medium text-green-700">
+                    {sendResult}
+                  </span>
+                )}
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
       {showAdd && isAdmin && conference && (
         <div className="border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
           <div className="mx-auto max-w-3xl">

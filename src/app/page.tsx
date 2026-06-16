@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useNotifications } from "@/hooks/useNotifications";
 import { DelegateManager } from "@/components/delegates/DelegateManager";
 import { DocumentPanel } from "@/components/documents/DocumentPanel";
 import {
@@ -116,9 +117,40 @@ function AdminSetupScreen() {
   );
 }
 
+function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeof useConference>["activeCommittee"]> }) {
+  const latestRollCall = committee.rollCalls[0] ?? null;
+  if (!latestRollCall) return null;
+
+  const presentVoting = Object.values(latestRollCall.attendance).filter(
+    (s) => s === "present_voting"
+  ).length;
+  const present = Object.values(latestRollCall.attendance).filter(
+    (s) => s === "present" || s === "present_voting"
+  ).length;
+
+  // Simple majority: > 50% of present delegates
+  const simpleMajority = Math.floor(present / 2) + 1;
+  // Supermajority: ≥ 2/3 of present_voting delegates (per Rule 23)
+  const superMajority = Math.ceil((presentVoting * 2) / 3);
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-4 text-sm">
+      <span className="text-purple-600">
+        Based on latest roll call ({latestRollCall.label}):
+      </span>
+      <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
+        Simple majority: {simpleMajority} votes ({present} present)
+      </span>
+      <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
+        Supermajority ⅔: {superMajority} votes ({presentVoting} P&amp;V)
+      </span>
+    </div>
+  );
+}
+
 function CommitteeWorkspace() {
   const { activeCommittee } = useConference();
-  const [activeTab, setActiveTab] = useState<TabId>("rollcall");
+  const [activeTab, setActiveTab] = useState<TabId>("delegates");
 
   if (!activeCommittee) return null;
 
@@ -145,6 +177,7 @@ function CommitteeWorkspace() {
             {activeCommittee.type.toUpperCase()} ·{" "}
             {activeCommittee.topic || "No topic set"}
           </p>
+          <VoteThresholds committee={activeCommittee} />
         </div>
         {panels[activeTab]}
       </main>
@@ -156,6 +189,9 @@ export default function Home() {
   const { user, authLoading } = useAuth();
   const { conference, loading, activeCommittee, syncError, clearSyncError } =
     useConference();
+  const { notifications, dismiss, dismissAll } = useNotifications(
+    !authLoading && !loading && !!user
+  );
 
   if (authLoading || loading) {
     return (
@@ -180,6 +216,40 @@ export default function Home() {
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {notifications.length > 0 && (
+        <div className="border-b border-blue-200 bg-blue-50">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className="flex items-start justify-between gap-4 border-b border-blue-100 px-4 py-2 last:border-0"
+            >
+              <div className="flex items-start gap-2 text-sm text-blue-900">
+                <span className="mt-0.5 shrink-0 rounded bg-blue-200 px-1.5 py-0.5 text-xs font-semibold text-blue-800">
+                  From Admin
+                </span>
+                <span>{n.message}</span>
+              </div>
+              <button
+                onClick={() => dismiss(n.id)}
+                className="shrink-0 text-blue-500 hover:text-blue-900 text-xs"
+              >
+                Dismiss
+              </button>
+            </div>
+          ))}
+          {notifications.length > 1 && (
+            <div className="px-4 py-1 text-right">
+              <button
+                onClick={dismissAll}
+                className="text-xs text-blue-600 hover:text-blue-900"
+              >
+                Dismiss all
+              </button>
+            </div>
+          )}
         </div>
       )}
 
