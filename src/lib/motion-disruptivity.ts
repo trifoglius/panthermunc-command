@@ -1,4 +1,5 @@
 import { MOTION_TYPES } from "./constants";
+import { isAffirmative } from "./motion-timers";
 
 function parseMinutes(value?: string): number {
   const n = Number(value);
@@ -41,7 +42,7 @@ export function computeMotionDisruptivity(
       return slots > 0 ? baseDisruptivity + slots : baseDisruptivity;
     }
     case "enter_voting":
-      if (details.two_for_two_against === "yes") {
+      if (isAffirmative(details.two_for_two_against)) {
         return baseDisruptivity + 4;
       }
       return baseDisruptivity;

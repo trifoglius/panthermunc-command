@@ -8,6 +8,51 @@ export interface MotionTimerConfig {
   hasSpeakerQueue: boolean;
   queueMode?: "single" | "for_against";
   speakingEventType: string;
+  votingSpeakerOrder?: VotingSpeakerOrder;
+}
+
+export type VotingSpeakerOrder = "for_first" | "against_first";
+
+export function isAffirmative(value?: string): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "yes" || normalized === "y" || normalized === "true";
+}
+
+export function parseVotingSpeakerOrder(value?: string): VotingSpeakerOrder {
+  if (!value) return "for_first";
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "against_first" ||
+    normalized === "against first" ||
+    normalized.startsWith("against")
+  ) {
+    return "against_first";
+  }
+  return "for_first";
+}
+
+export function applySpeakOrderReserve(
+  queue: string[],
+  proposedBy: string,
+  speakOrder?: string
+): string[] {
+  if (!speakOrder || !proposedBy) return queue;
+  const unique = queue.filter((id, index) => queue.indexOf(id) === index);
+  const others = unique.filter((id) => id !== proposedBy);
+  if (speakOrder === "first") return [proposedBy, ...others];
+  if (speakOrder === "last") return [...others, proposedBy];
+  return unique;
+}
+
+export function addSpeakerWithReserve(
+  queue: string[],
+  speakerId: string,
+  proposedBy: string,
+  speakOrder?: string
+): string[] {
+  const next = queue.includes(speakerId) ? queue : [...queue, speakerId];
+  return applySpeakOrderReserve(next, proposedBy, speakOrder);
 }
 
 export function getMotionTypeId(motion: Motion): string | undefined {
@@ -66,7 +111,7 @@ export function getTimerConfig(motion: Motion): MotionTimerConfig | null {
       };
     }
     case "enter_voting":
-      if (d.two_for_two_against !== "yes") return null;
+      if (!isAffirmative(d.two_for_two_against)) return null;
       {
         const speakingSeconds = parseSeconds(d.speaking_time) || 120;
         return {
@@ -75,6 +120,7 @@ export function getTimerConfig(motion: Motion): MotionTimerConfig | null {
           hasSpeakerQueue: true,
           queueMode: "for_against",
           speakingEventType: "voting_procedure",
+          votingSpeakerOrder: parseVotingSpeakerOrder(d.speaker_order),
         };
       }
     default:
@@ -108,7 +154,7 @@ export function isFormalSpeakingMotion(motion: Motion): boolean {
   const typeId = getMotionTypeId(motion);
   if (!typeId) return false;
   if (typeId === "enter_voting") {
-    return motion.details.two_for_two_against === "yes";
+    return isAffirmative(motion.details.two_for_two_against);
   }
   return FORMAL_SPEAKING_IDS.has(typeId);
 }
@@ -119,13 +165,19 @@ export function motionHasTimer(motion: Motion): boolean {
 
 export function buildVotingSpeakerQueue(
   speakersFor: string[],
-  speakersAgainst: string[]
+  speakersAgainst: string[],
+  speakerOrder: VotingSpeakerOrder = "for_first"
 ): string[] {
   const max = Math.max(speakersFor.length, speakersAgainst.length);
   const result: string[] = [];
   for (let i = 0; i < max; i++) {
-    if (speakersFor[i]) result.push(speakersFor[i]);
-    if (speakersAgainst[i]) result.push(speakersAgainst[i]);
+    if (speakerOrder === "for_first") {
+      if (speakersFor[i]) result.push(speakersFor[i]);
+      if (speakersAgainst[i]) result.push(speakersAgainst[i]);
+    } else {
+      if (speakersAgainst[i]) result.push(speakersAgainst[i]);
+      if (speakersFor[i]) result.push(speakersFor[i]);
+    }
   }
   return result;
 }

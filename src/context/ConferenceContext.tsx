@@ -34,7 +34,7 @@ import type {
   SpeakingEvent,
 } from "@/lib/types";
 import type { CommitteeData } from "@/db/schema";
-import { isFormalSpeakingMotion, getMotionTypeId } from "@/lib/motion-timers";
+import { isFormalSpeakingMotion, getMotionTypeId, isAffirmative } from "@/lib/motion-timers";
 
 // ---------------------------------------------------------------------------
 // Data shape helpers
@@ -651,7 +651,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       const isVotingForAgainst =
         passedMotion &&
         getMotionTypeId(passedMotion) === "enter_voting" &&
-        passedMotion.details.two_for_two_against === "yes";
+        isAffirmative(passedMotion.details.two_for_two_against);
       const speakerQueue =
         passedMotion && isFormalSpeakingMotion(passedMotion) && !isVotingForAgainst
           ? motionState?.speakerQueue

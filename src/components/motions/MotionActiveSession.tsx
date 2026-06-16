@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { useSessionTimers } from "@/hooks/useSessionTimers";
 import { useCountdown } from "@/hooks/useCountdown";
 import {
+  addSpeakerWithReserve,
+  applySpeakOrderReserve,
   buildVotingSpeakerQueue,
   formatTime,
   getTimerConfig,
+  parseVotingSpeakerOrder,
   type MotionTimerConfig,
 } from "@/lib/motion-timers";
 import type { Motion } from "@/lib/types";
@@ -242,7 +245,15 @@ function SpeakerQueue({
     useConference();
   const savedQueue =
     activeCommittee?.motionSessionState?.[motion.id]?.speakerQueue ?? [];
-  const [queue, setQueue] = useState<string[]>(savedQueue);
+  const initialQueue =
+    savedQueue.length > 0
+      ? savedQueue
+      : applySpeakOrderReserve(
+          [],
+          motion.proposedBy,
+          motion.details.speak_order
+        );
+  const [queue, setQueue] = useState<string[]>(initialQueue);
   const [addId, setAddId] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -250,6 +261,11 @@ function SpeakerQueue({
     setQueue(next);
     setMotionSpeakerQueue(motion.id, next);
   };
+
+  useEffect(() => {
+    if (savedQueue.length > 0 || initialQueue.length === 0) return;
+    setMotionSpeakerQueue(motion.id, initialQueue);
+  }, [initialQueue, motion.id, savedQueue.length, setMotionSpeakerQueue]);
 
   if (!activeCommittee) return null;
 
@@ -261,7 +277,14 @@ function SpeakerQueue({
 
   const addSpeaker = () => {
     if (!addId || queue.includes(addId)) return;
-    updateQueue([...queue, addId]);
+    updateQueue(
+      addSpeakerWithReserve(
+        queue,
+        addId,
+        motion.proposedBy,
+        motion.details.speak_order
+      )
+    );
     setAddId("");
   };
 
@@ -352,7 +375,13 @@ function SpeakerQueue({
                     size="sm"
                     variant="ghost"
                     onClick={() =>
-                      updateQueue(queue.filter((_, idx) => idx !== i))
+                      updateQueue(
+                        applySpeakOrderReserve(
+                          queue.filter((_, idx) => idx !== i),
+                          motion.proposedBy,
+                          motion.details.speak_order
+                        )
+                      )
                     }
                   >
                     Remove
@@ -434,7 +463,12 @@ function VotingSpeakerQueue({
   const [addAgainstId, setAddAgainstId] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const combinedQueue = buildVotingSpeakerQueue(speakersFor, speakersAgainst);
+  const combinedQueue = buildVotingSpeakerQueue(
+    speakersFor,
+    speakersAgainst,
+    config.votingSpeakerOrder ??
+      parseVotingSpeakerOrder(motion.details.speaker_order)
+  );
 
   const persistSpeakers = (nextFor: string[], nextAgainst: string[]) => {
     setSpeakersFor(nextFor);
@@ -586,9 +620,13 @@ function VotingSpeakerQueue({
         2-for-2-against Speakers
       </h4>
       <p className="mb-3 text-sm text-purple-600">
-        Add two speakers for and two against. Speaking order alternates
-        (for, against, for, against). Total time is four times the individual
-        speaking time.
+        Add two speakers for and two against. Speaking order alternates (
+        {config.votingSpeakerOrder === "against_first" ||
+        parseVotingSpeakerOrder(motion.details.speaker_order) ===
+          "against_first"
+          ? "against, for, against, for"
+          : "for, against, for, against"}
+        ). Total time is four times the individual speaking time.
       </p>
 
       {timers.hasTotal && (

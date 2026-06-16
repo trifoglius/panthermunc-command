@@ -30,7 +30,31 @@ export const CRISIS_RUBRIC = [
   { key: "directive_quality", label: "Directive Quality", max: 10 },
 ];
 
-export const MOTION_TYPES = [
+export interface MotionFieldOption {
+  value: string;
+  label: string;
+}
+
+export interface MotionFieldShowWhen {
+  field: string;
+  value: string;
+}
+
+export interface MotionField {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "document_select";
+  options?: MotionFieldOption[];
+  showWhen?: MotionFieldShowWhen;
+}
+
+export const MOTION_TYPES: {
+  id: string;
+  label: string;
+  rule: number;
+  disruptivity: number;
+  fields: MotionField[];
+}[] = [
   {
     id: "close_debate",
     label: "Motion to Close Debate",
@@ -44,9 +68,31 @@ export const MOTION_TYPES = [
     rule: 21,
     disruptivity: 95,
     fields: [
-      { key: "two_for_two_against", label: "2-for-2-against period?", type: "select" },
-      { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
-      { key: "speaker_order", label: "Order of speakers", type: "text" },
+      {
+        key: "two_for_two_against",
+        label: "2-for-2-against period?",
+        type: "select",
+        options: [
+          { value: "no", label: "No" },
+          { value: "yes", label: "Yes" },
+        ],
+      },
+      {
+        key: "speaking_time",
+        label: "Speaking time (sec)",
+        type: "text",
+        showWhen: { field: "two_for_two_against", value: "yes" },
+      },
+      {
+        key: "speaker_order",
+        label: "Order of speakers",
+        type: "select",
+        options: [
+          { value: "for_first", label: "For first, then alternate" },
+          { value: "against_first", label: "Against first, then alternate" },
+        ],
+        showWhen: { field: "two_for_two_against", value: "yes" },
+      },
       { key: "paper_order", label: "Order of papers to vote", type: "text" },
       { key: "vote_manner", label: "Voting manner", type: "select" },
     ],
@@ -74,10 +120,22 @@ export const MOTION_TYPES = [
     rule: 17,
     disruptivity: 80,
     fields: [
-      { key: "resolution", label: "Draft resolution", type: "text" },
+      {
+        key: "resolution",
+        label: "Draft resolution",
+        type: "document_select",
+      },
       { key: "clause", label: "Clause to amend", type: "text" },
       { key: "language", label: "Proposed language", type: "textarea" },
-      { key: "amendment_type", label: "Friendly or unfriendly", type: "select" },
+      {
+        key: "amendment_type",
+        label: "Friendly or unfriendly",
+        type: "select",
+        options: [
+          { value: "friendly", label: "Friendly" },
+          { value: "unfriendly", label: "Unfriendly" },
+        ],
+      },
     ],
   },
   {
@@ -100,7 +158,16 @@ export const MOTION_TYPES = [
       { key: "duration", label: "Duration (min)", type: "text" },
       { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
       { key: "topic", label: "Topic", type: "text" },
-      { key: "speak_order", label: "Reserve first/last?", type: "text" },
+      {
+        key: "speak_order",
+        label: "Reserve first/last?",
+        type: "select",
+        options: [
+          { value: "", label: "None" },
+          { value: "first", label: "Speak first" },
+          { value: "last", label: "Speak last" },
+        ],
+      },
     ],
   },
   {
@@ -154,7 +221,7 @@ export const MOTION_TYPES = [
     disruptivity: 20,
     fields: [{ key: "topic", label: "Agenda topic", type: "text" }],
   },
-] as const;
+];
 
 export const VOTE_MANNERS = [
   "Vote by Acclamation",

@@ -6,6 +6,7 @@ import { MotionActiveSession } from "@/components/motions/MotionActiveSession";
 import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
 import { computeMotionDisruptivity } from "@/lib/motion-disruptivity";
 import { getTimerConfig, motionHasTimer } from "@/lib/motion-timers";
+import type { MotionField } from "@/lib/constants";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
 
@@ -28,6 +29,93 @@ export function MotionPanel() {
   const activeMotion = activeCommittee.motions.find(
     (m) => m.id === activeMotionId
   );
+
+  const draftResolutions = activeCommittee.documents.filter(
+    (doc) => doc.type === "draft_resolution"
+  );
+
+  const visibleFields = selectedMotion.fields.filter((field) => {
+    if (!field.showWhen) return true;
+    return details[field.showWhen.field] === field.showWhen.value;
+  });
+
+  const renderMotionField = (field: MotionField) => {
+    if (field.type === "textarea") {
+      return (
+        <Textarea
+          key={field.key}
+          label={field.label}
+          value={details[field.key] ?? ""}
+          onChange={(e) =>
+            setDetails({ ...details, [field.key]: e.target.value })
+          }
+          rows={3}
+        />
+      );
+    }
+
+    if (field.type === "document_select") {
+      return (
+        <Select
+          key={field.key}
+          label={field.label}
+          value={details[field.key] ?? ""}
+          onChange={(e) =>
+            setDetails({ ...details, [field.key]: e.target.value })
+          }
+          options={[
+            { value: "", label: "Select draft resolution..." },
+            ...draftResolutions.map((doc) => ({
+              value: doc.id,
+              label: doc.title,
+            })),
+          ]}
+        />
+      );
+    }
+
+    if (field.type === "select") {
+      const options =
+        field.key === "vote_manner"
+          ? [
+              { value: "", label: "Select..." },
+              ...VOTE_MANNERS.map((v) => ({ value: v, label: v })),
+            ]
+          : [
+              { value: "", label: "Select..." },
+              ...(field.options ?? []),
+            ];
+
+      return (
+        <Select
+          key={field.key}
+          label={field.label}
+          value={details[field.key] ?? ""}
+          onChange={(e) => {
+            const value = e.target.value;
+            const next = { ...details, [field.key]: value };
+            if (field.key === "two_for_two_against" && value !== "yes") {
+              delete next.speaking_time;
+              delete next.speaker_order;
+            }
+            setDetails(next);
+          }}
+          options={options}
+        />
+      );
+    }
+
+    return (
+      <Input
+        key={field.key}
+        label={field.label}
+        value={details[field.key] ?? ""}
+        onChange={(e) =>
+          setDetails({ ...details, [field.key]: e.target.value })
+        }
+      />
+    );
+  };
 
   const handleSubmit = () => {
     if (!proposedBy) return;
@@ -112,56 +200,9 @@ export function MotionPanel() {
           />
         </div>
 
-        {selectedMotion.fields.length > 0 && (
+        {visibleFields.length > 0 && (
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {selectedMotion.fields.map((field) =>
-              field.type === "textarea" ? (
-                <Textarea
-                  key={field.key}
-                  label={field.label}
-                  value={details[field.key] ?? ""}
-                  onChange={(e) =>
-                    setDetails({ ...details, [field.key]: e.target.value })
-                  }
-                  rows={3}
-                />
-              ) : field.type === "select" && field.key === "vote_manner" ? (
-                <Select
-                  key={field.key}
-                  label={field.label}
-                  value={details[field.key] ?? ""}
-                  onChange={(e) =>
-                    setDetails({ ...details, [field.key]: e.target.value })
-                  }
-                  options={[
-                    { value: "", label: "Select..." },
-                    ...VOTE_MANNERS.map((v) => ({ value: v, label: v })),
-                  ]}
-                />
-              ) : field.type === "select" ? (
-                <Select
-                  key={field.key}
-                  label={field.label}
-                  value={details[field.key] ?? ""}
-                  onChange={(e) =>
-                    setDetails({ ...details, [field.key]: e.target.value })
-                  }
-                  options={[
-                    { value: "yes", label: "Yes" },
-                    { value: "no", label: "No" },
-                  ]}
-                />
-              ) : (
-                <Input
-                  key={field.key}
-                  label={field.label}
-                  value={details[field.key] ?? ""}
-                  onChange={(e) =>
-                    setDetails({ ...details, [field.key]: e.target.value })
-                  }
-                />
-              )
-            )}
+            {visibleFields.map((field) => renderMotionField(field))}
           </div>
         )}
 
@@ -256,13 +297,37 @@ function MotionRow({
             {new Date(motion.timestamp).toLocaleString()} · Disruptivity:{" "}
             {motion.disruptivity}
           </p>
-          {Object.entries(motion.details).map(([k, v]) =>
-            v ? (
+          {Object.entries(motion.details).map(([k, v]) => {
+            if (!v) return null;
+            let display = v;
+            if (k === "resolution") {
+              const doc = committee.documents.find((d) => d.id === v);
+              display = doc?.title ?? v;
+            } else if (k === "speak_order") {
+              display =
+                v === "first"
+                  ? "Speak first"
+                  : v === "last"
+                    ? "Speak last"
+                    : v;
+            } else if (k === "speaker_order") {
+              display =
+                v === "against_first"
+                  ? "Against first, then alternate"
+                  : v === "for_first"
+                    ? "For first, then alternate"
+                    : v;
+            } else if (k === "amendment_type") {
+              display = v === "friendly" ? "Friendly" : v === "unfriendly" ? "Unfriendly" : v;
+            } else if (k === "two_for_two_against") {
+              display = v === "yes" ? "Yes" : v === "no" ? "No" : v;
+            }
+            return (
               <p key={k} className="text-sm text-purple-700">
-                {k.replace(/_/g, " ")}: {v}
+                {k.replace(/_/g, " ")}: {display}
               </p>
-            ) : null
-          )}
+            );
+          })}
           {motion.notes && (
             <p className="text-sm italic text-purple-600">{motion.notes}</p>
           )}
