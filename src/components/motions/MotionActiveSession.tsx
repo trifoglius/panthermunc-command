@@ -4,16 +4,19 @@ import { useEffect, useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { useSessionTimers } from "@/hooks/useSessionTimers";
 import { useCountdown } from "@/hooks/useCountdown";
+import { VotingPapersPanel } from "@/components/motions/VotingPapersPanel";
 import {
   addSpeakerWithReserve,
   applySpeakOrderReserve,
   buildVotingSpeakerQueue,
   formatTime,
+  getMotionTypeId,
   getTimerConfig,
   parseVotingSpeakerOrder,
   type MotionTimerConfig,
 } from "@/lib/motion-timers";
 import type { Motion } from "@/lib/types";
+import { isDelegatePresent } from "@/lib/rollcall";
 import { Badge, Button, Card, Select } from "@/components/ui";
 
 interface MotionActiveSessionProps {
@@ -26,22 +29,9 @@ export function MotionActiveSession({
   onDismiss,
 }: MotionActiveSessionProps) {
   const config = getTimerConfig(motion);
-  if (!config) return null;
+  const isVotingProcedure = getMotionTypeId(motion) === "enter_voting";
 
-  return (
-    <MotionActiveSessionBody motion={motion} onDismiss={onDismiss} config={config} />
-  );
-}
-
-function MotionActiveSessionBody({
-  motion,
-  onDismiss,
-  config,
-}: MotionActiveSessionProps & { config: MotionTimerConfig }) {
-  const timers = useSessionTimers(
-    config.totalSeconds ?? 0,
-    config.speakingSeconds ?? 0
-  );
+  if (!config && !isVotingProcedure) return null;
 
   return (
     <Card title={`Active: ${motion.type}`} className="border-2 border-purple-400">
@@ -51,6 +41,28 @@ function MotionActiveSessionBody({
           Dismiss
         </Button>
       </div>
+      {config ? (
+        <MotionActiveSessionBody motion={motion} config={config} />
+      ) : null}
+      {isVotingProcedure && <VotingPapersPanel motion={motion} />}
+    </Card>
+  );
+}
+
+function MotionActiveSessionBody({
+  motion,
+  config,
+}: {
+  motion: Motion;
+  config: MotionTimerConfig;
+}) {
+  const timers = useSessionTimers(
+    config.totalSeconds ?? 0,
+    config.speakingSeconds ?? 0
+  );
+
+  return (
+    <>
       <TimerDisplay config={config} motion={motion} timers={timers} />
       {config.hasSpeakerQueue &&
         (config.queueMode === "for_against" ? (
@@ -62,7 +74,7 @@ function MotionActiveSessionBody({
         ) : (
           <SpeakerQueue motion={motion} config={config} timers={timers} />
         ))}
-    </Card>
+    </>
   );
 }
 
@@ -272,7 +284,7 @@ function SpeakerQueue({
   const speakingSeconds = timers.speakingInitial;
   const pendingIds = queue.slice(currentIndex);
   const available = activeCommittee.delegates.filter(
-    (d) => !pendingIds.includes(d.id)
+    (d) => !pendingIds.includes(d.id) && isDelegatePresent(activeCommittee, d.id)
   );
   const currentSpeakerId = queue[currentIndex];
 
@@ -480,7 +492,9 @@ function VotingSpeakerQueue({
   if (!activeCommittee) return null;
 
   const usedIds = new Set([...speakersFor, ...speakersAgainst]);
-  const available = activeCommittee.delegates.filter((d) => !usedIds.has(d.id));
+  const available = activeCommittee.delegates.filter(
+    (d) => !usedIds.has(d.id) && isDelegatePresent(activeCommittee, d.id)
+  );
   const speakingSeconds = timers.speakingInitial;
   const currentSpeakerId = combinedQueue[currentIndex];
 

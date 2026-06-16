@@ -27,6 +27,7 @@ import type {
   MotionQueueSnapshot,
   Point,
   PositionPaperStatus,
+  PaperVoteRecord,
   RollCallSession,
   RollCallStatus,
   RubricScore,
@@ -136,6 +137,7 @@ interface ConferenceContextValue {
     withDefaults?: boolean
   ) => Promise<string>;
   selectCommittee: (id: string | null) => Promise<void>;
+  loadAllCommitteeData: () => Promise<void>;
   updateCommittee: (committee: Committee) => void;
   addDelegate: (
     country: string,
@@ -158,6 +160,7 @@ interface ConferenceContextValue {
     speakersFor: string[],
     speakersAgainst: string[]
   ) => void;
+  setMotionPaperVotes: (motionId: string, paperVotes: PaperVoteRecord[]) => void;
   archiveMotionQueue: (passedMotionId: string) => void;
   addDocument: (doc: Omit<Document, "id" | "amendments">) => void;
   updateDocument: (doc: Document) => void;
@@ -232,6 +235,11 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       // non-fatal
     }
   }, []);
+
+  const loadAllCommitteeData = useCallback(async () => {
+    const committees = conferenceRef.current?.committees ?? [];
+    await Promise.all(committees.map((c) => loadCommitteeData(c.id)));
+  }, [loadCommitteeData]);
 
   // ---------------------------------------------------------------------------
   // Load conference on mount (after auth resolves)
@@ -641,6 +649,23 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const setMotionPaperVotes = (
+    motionId: string,
+    paperVotes: PaperVoteRecord[]
+  ) => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => ({
+      ...c,
+      motionSessionState: {
+        ...(c.motionSessionState ?? {}),
+        [motionId]: {
+          ...(c.motionSessionState?.[motionId] ?? {}),
+          paperVotes,
+        },
+      },
+    }));
+  };
+
   const archiveMotionQueue = (passedMotionId: string) => {
     const cid = requireCommittee();
     patchCommittee(cid, (c) => {
@@ -926,6 +951,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         deleteConference,
         createCommittee,
         selectCommittee,
+        loadAllCommitteeData,
         updateCommittee,
         addDelegate,
         updateDelegate,
@@ -936,6 +962,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         updateMotion,
         setMotionSpeakerQueue,
         setMotionVotingSpeakers,
+        setMotionPaperVotes,
         archiveMotionQueue,
         addDocument,
         updateDocument,

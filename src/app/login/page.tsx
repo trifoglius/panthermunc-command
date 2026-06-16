@@ -11,6 +11,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [bootstrapPassword, setBootstrapPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -39,12 +40,21 @@ function LoginForm() {
   };
 
   const handleBootstrap = async () => {
+    if (!bootstrapPassword) return;
     setError("");
     setInfo("");
     setBootstrapping(true);
     try {
-      const r = await fetch("/api/bootstrap", { method: "POST" });
+      const r = await fetch("/api/bootstrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: bootstrapPassword }),
+      });
       const body = await r.json().catch(() => ({}));
+      if (r.status === 403) {
+        setError(body?.error ?? "Invalid bootstrap admin password");
+        return;
+      }
       if (r.status === 409) {
         setInfo(
           "System is already initialized. If login still fails, your admin password may have changed."
@@ -58,6 +68,7 @@ function LoginForm() {
       setInfo(
         "System initialized. Sign in using the bootstrap admin credentials."
       );
+      setBootstrapPassword("");
     } catch {
       setError("Failed to initialize system");
     } finally {
@@ -106,14 +117,29 @@ function LoginForm() {
             >
               {submitting ? "Signing in..." : "Sign In"}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleBootstrap}
-              disabled={bootstrapping}
-            >
-              {bootstrapping ? "Initializing..." : "Initialize / Recover Admin"}
-            </Button>
+            <div className="border-t border-purple-100 pt-4">
+              <Input
+                label="Bootstrap Admin Password"
+                type="password"
+                value={bootstrapPassword}
+                onChange={(e) => setBootstrapPassword(e.target.value)}
+                autoComplete="off"
+                placeholder="Required to initialize system"
+              />
+              <p className="mt-1 text-xs text-purple-600">
+                Only conference admins with the bootstrap password can initialize
+                or recover the system.
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-3 w-full"
+                onClick={handleBootstrap}
+                disabled={bootstrapping || !bootstrapPassword}
+              >
+                {bootstrapping ? "Initializing..." : "Initialize / Recover Admin"}
+              </Button>
+            </div>
           </form>
         </Card>
       </div>

@@ -1,5 +1,13 @@
+import { timingSafeEqual } from "crypto";
 import { hash } from "bcryptjs";
 import { db, conferences, users } from "@/db";
+
+function secureCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 /**
  * POST /api/bootstrap
@@ -11,18 +19,24 @@ import { db, conferences, users } from "@/db";
  *   BOOTSTRAP_ADMIN_USERNAME
  *   BOOTSTRAP_ADMIN_PASSWORD
  *
- * Call once after first deploy:
- *   curl -X POST https://your-domain/api/bootstrap
+ * Body: { password: string } — must match BOOTSTRAP_ADMIN_PASSWORD
  */
 export async function POST(request: Request) {
-  const bootstrapToken = process.env.BOOTSTRAP_TOKEN;
-  if (bootstrapToken) {
-    const providedToken = request.headers.get("x-bootstrap-token");
-    // Optional hardening: require a shared secret to call bootstrap.
-    // This avoids unauthenticated first-hit takeover in exposed environments.
-    if (providedToken !== bootstrapToken) {
-      return Response.json({ error: "Invalid bootstrap token" }, { status: 403 });
-    }
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
+    return Response.json({ error: "Invalid request body" }, { status: 400 });
+  }
+  const providedPassword = (body as { password?: unknown }).password;
+  if (typeof providedPassword !== "string" || !providedPassword) {
+    return Response.json(
+      { error: "Bootstrap admin password is required" },
+      { status: 400 }
+    );
   }
 
   const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
@@ -36,6 +50,10 @@ export async function POST(request: Request) {
       },
       { status: 500 }
     );
+  }
+
+  if (!secureCompare(providedPassword, password)) {
+    return Response.json({ error: "Invalid bootstrap password" }, { status: 403 });
   }
 
   // Guard: do not allow re-bootstrapping if a conference already exists

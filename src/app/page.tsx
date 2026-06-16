@@ -19,6 +19,7 @@ import { Button, Card, Input, Select } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import type { CommitteeType } from "@/lib/types";
+import { getVoteThresholds } from "@/lib/voting";
 
 // Admin-only setup screen shown when no committees exist yet
 function AdminSetupScreen() {
@@ -124,14 +125,8 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
   const presentVoting = Object.values(latestRollCall.attendance).filter(
     (s) => s === "present_voting"
   ).length;
-  const present = Object.values(latestRollCall.attendance).filter(
-    (s) => s === "present" || s === "present_voting"
-  ).length;
 
-  // Simple majority: > 50% of present delegates
-  const simpleMajority = Math.floor(present / 2) + 1;
-  // Supermajority: ≥ 2/3 of present_voting delegates (per Rule 23)
-  const superMajority = Math.ceil((presentVoting * 2) / 3);
+  const { simpleMajority, superMajority } = getVoteThresholds(presentVoting);
 
   return (
     <div className="mt-2 flex flex-wrap gap-4 text-sm">
@@ -139,7 +134,7 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
         Based on latest roll call ({latestRollCall.label}):
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Simple majority: {simpleMajority} votes ({present} present)
+        Simple majority: {simpleMajority} votes ({presentVoting} P&amp;V)
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
         Supermajority ⅔: {superMajority} votes ({presentVoting} P&amp;V)

@@ -7,25 +7,8 @@ import { Badge, Button, Card, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { exportConferenceLogs } from "@/lib/conference-logs-export";
+import { getCommitteeStats } from "@/lib/conference-stats";
 import type { Committee } from "@/lib/types";
-
-function committeeStats(c: Committee) {
-  const latestRollCall = c.rollCalls[0] ?? null;
-  const presentCount = latestRollCall
-    ? Object.values(latestRollCall.attendance).filter(
-        (s) => s === "present" || s === "present_voting"
-      ).length
-    : null;
-
-  const passedMotions = c.motions.filter((m) => m.status === "passed");
-  const lastPassedMotion = passedMotions[0] ?? null;
-
-  const adoptedResolutions = c.documents.filter(
-    (d) => d.type === "draft_resolution" && d.status === "adopted"
-  ).length;
-
-  return { presentCount, passedMotions: passedMotions.length, lastPassedMotion, adoptedResolutions };
-}
 
 function ConferenceStatsCard({ committees }: { committees: Committee[] }) {
   if (committees.length === 0) return null;
@@ -34,7 +17,7 @@ function ConferenceStatsCard({ committees }: { committees: Committee[] }) {
       <div className="space-y-4">
         {committees.map((c) => {
           const { presentCount, passedMotions, lastPassedMotion, adoptedResolutions } =
-            committeeStats(c);
+            getCommitteeStats(c);
           return (
             <div
               key={c.id}
@@ -86,6 +69,7 @@ export default function SettingsPage() {
     updateCommittee,
     removeCommittee,
     deleteConference,
+    loadAllCommitteeData,
   } = useConference();
 
   const [draftName, setDraftName] = useState<string | null>(null);
@@ -104,6 +88,16 @@ export default function SettingsPage() {
       router.replace("/");
     }
   }, [user, authLoading, router]);
+
+  // Load full data for every committee so stats reflect all rooms (GA, crisis, specialized)
+  useEffect(() => {
+    if (loading || !conference) return;
+    void loadAllCommitteeData();
+    const interval = setInterval(() => {
+      void loadAllCommitteeData();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [loading, conference?.id, loadAllCommitteeData]);
 
   if (authLoading || loading) {
     return (

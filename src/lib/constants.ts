@@ -43,7 +43,7 @@ export interface MotionFieldShowWhen {
 export interface MotionField {
   key: string;
   label: string;
-  type: "text" | "textarea" | "select" | "document_select";
+  type: "text" | "textarea" | "select" | "document_select" | "document_order";
   options?: MotionFieldOption[];
   showWhen?: MotionFieldShowWhen;
 }
@@ -136,6 +136,11 @@ export const MOTION_TYPES: {
       { key: "reading_period", label: "Reading period (min)", type: "text" },
       { key: "presentation_period", label: "Presentation period (min)", type: "text" },
       { key: "qa_period", label: "Q&A period (min)", type: "text" },
+      {
+        key: "presentation_order",
+        label: "Order of presentation",
+        type: "document_order",
+      },
     ],
   },
   {
@@ -217,7 +222,7 @@ export const MOTION_TYPES: {
         ],
         showWhen: { field: "two_for_two_against", value: "yes" },
       },
-      { key: "paper_order", label: "Order of papers to vote", type: "text" },
+      { key: "paper_order", label: "Order of papers to vote", type: "document_order" },
       { key: "vote_manner", label: "Voting manner", type: "select" },
     ],
   },

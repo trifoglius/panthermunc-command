@@ -163,6 +163,10 @@ export function motionHasTimer(motion: Motion): boolean {
   return getTimerConfig(motion) !== null;
 }
 
+export function motionHasActiveSession(motion: Motion): boolean {
+  return motionHasTimer(motion) || getMotionTypeId(motion) === "enter_voting";
+}
+
 export function buildVotingSpeakerQueue(
   speakersFor: string[],
   speakersAgainst: string[],

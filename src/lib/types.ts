@@ -103,6 +103,14 @@ export interface MotionSessionState {
   speakerQueue?: string[];
   speakersFor?: string[];
   speakersAgainst?: string[];
+  paperVotes?: PaperVoteRecord[];
+}
+
+export interface PaperVoteRecord {
+  documentId: string;
+  votesFor: number;
+  votesAgainst: number;
+  votesAbstain: number;
 }
 
 export interface MotionQueueSnapshot {

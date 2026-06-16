@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { MotionActiveSession } from "@/components/motions/MotionActiveSession";
+import { DocumentOrderField } from "@/components/motions/DocumentOrderField";
 import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
 import { computeMotionDisruptivity } from "@/lib/motion-disruptivity";
-import { getTimerConfig, motionHasTimer } from "@/lib/motion-timers";
+import { motionHasActiveSession } from "@/lib/motion-timers";
+import { parseDocumentOrder } from "@/lib/voting";
 import type { MotionField } from "@/lib/constants";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
@@ -51,6 +53,21 @@ export function MotionPanel() {
           }
           rows={3}
         />
+      );
+    }
+
+    if (field.type === "document_order") {
+      return (
+        <div key={field.key} className="md:col-span-2">
+          <DocumentOrderField
+            label={field.label}
+            value={details[field.key] ?? ""}
+            onChange={(value) =>
+              setDetails({ ...details, [field.key]: value })
+            }
+            documents={draftResolutions}
+          />
+        </div>
       );
     }
 
@@ -139,7 +156,7 @@ export function MotionPanel() {
   const handleStatusChange = (motion: Motion, status: MotionStatus) => {
     const updated = { ...motion, status };
     updateMotion(updated);
-    if (status === "passed" && getTimerConfig(updated)) {
+    if (status === "passed" && motionHasActiveSession(updated)) {
       setActiveMotionId(motion.id);
     }
   };
@@ -170,8 +187,7 @@ export function MotionPanel() {
 
       <Card title="Propose Motion">
         <p className="mb-3 text-sm text-purple-700">
-          Motions are voted on from most to least disruptive (Rule 3). When a
-          timed motion passes, a timer and speaker list will appear automatically.
+          Motions are voted on from most to least disruptive (Rule 3).
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           <Select
@@ -274,7 +290,7 @@ function MotionRow({
   onOpenSession: () => void;
 }) {
   const proposer = committee.delegates.find((d) => d.id === motion.proposedBy);
-  const hasTimer = motionHasTimer(motion);
+  const hasActiveSession = motionHasActiveSession(motion);
   const statusColors: Record<MotionStatus, "yellow" | "green" | "red" | "gray"> =
     {
       pending: "yellow",
@@ -303,6 +319,13 @@ function MotionRow({
             if (k === "resolution") {
               const doc = committee.documents.find((d) => d.id === v);
               display = doc?.title ?? v;
+            } else if (k === "presentation_order" || k === "paper_order") {
+              display = parseDocumentOrder(v)
+                .map((id, i) => {
+                  const doc = committee.documents.find((d) => d.id === id);
+                  return `${i + 1}. ${doc?.title ?? id}`;
+                })
+                .join("; ");
             } else if (k === "speak_order") {
               display =
                 v === "first"
@@ -334,9 +357,9 @@ function MotionRow({
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge color={statusColors[motion.status]}>{motion.status}</Badge>
-          {hasTimer && motion.status === "passed" && (
+          {hasActiveSession && motion.status === "passed" && (
             <Button size="sm" variant="secondary" onClick={onOpenSession}>
-              Open Timer
+              Open Session
             </Button>
           )}
         </div>
