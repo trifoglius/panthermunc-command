@@ -118,11 +118,11 @@ function CommitteeWorkspace() {
   if (!activeCommittee) return null;
 
   const panels: Record<TabId, React.ReactNode> = {
+    delegates: <DelegateManager />,
     rollcall: <RollCallPanel />,
     motions: <MotionPanel />,
     motion_queues: <MotionQueuesPanel />,
     documents: <DocumentPanel />,
-    delegates: <DelegateManager />,
     points: <PointsPanel />,
     scoring: <ScoringPanel />,
     stats: <StatsPanel />,
