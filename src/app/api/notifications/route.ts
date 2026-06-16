@@ -1,4 +1,4 @@
-import { authErrorResponse, requireAdmin, requireSession } from "@/lib/session";
+import { authErrorResponse, hasPermission, requirePermission, requireSession } from "@/lib/session";
 
 export interface Notification {
   id: string;
@@ -16,7 +16,7 @@ const store: Notification[] = [];
 // Body: { message: string; committeeIds?: string[] }
 export async function POST(request: Request) {
   try {
-    const session = await requireAdmin();
+    const session = await requirePermission("notifications:send");
     let body: unknown;
     try {
       body = await request.json();
@@ -75,8 +75,8 @@ export async function GET(request: Request) {
       return true;
     });
 
-    // Admins always see everything
-    if (session.role === "admin") {
+    // Conference admins see all notifications
+    if (hasPermission(session, "committee:access_all")) {
       results = since ? store.filter((n) => n.createdAt > since) : [...store];
     }
 
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
 // DELETE /api/notifications/:id  handled below via ?id= to keep one file
 export async function DELETE(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("notifications:send");
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) {

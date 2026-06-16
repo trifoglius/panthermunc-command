@@ -8,6 +8,13 @@
       "when": 1781581809901,
       "tag": "0000_round_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781700000000,
+      "tag": "0001_user_permissions",
+      "breakpoints": true
     }
   ]
 }

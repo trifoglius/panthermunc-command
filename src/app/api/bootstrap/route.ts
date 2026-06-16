@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { hash } from "bcryptjs";
 import { db, conferences, users } from "@/db";
+import { ROLE_TEMPLATES } from "@/lib/permissions";
 
 function secureCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
       username: username.trim().toLowerCase(),
       passwordHash,
       role: "admin",
+      permissions: ROLE_TEMPLATES.admin,
       committeeId: null,
       displayName: username.trim(),
     })

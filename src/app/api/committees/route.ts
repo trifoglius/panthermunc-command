@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { db, committees } from "@/db";
 import type { CommitteeData } from "@/db/schema";
 import { authErrorResponse, requireAdmin } from "@/lib/session";
+import { canAccessAllCommittees } from "@/lib/permissions";
 import { DEFAULT_DELEGATES_GA } from "@/lib/constants";
 import { createEmptyRubricScore } from "@/lib/scoring";
 import type { CommitteeType, Delegate } from "@/lib/types";
@@ -106,10 +107,9 @@ export async function GET() {
       .from(committees)
       .where(eq(committees.conferenceId, session.conferenceId));
 
-    const visible =
-      session.role === "admin"
-        ? rows
-        : rows.filter((c) => c.id === session.committeeId);
+    const visible = canAccessAllCommittees(session)
+      ? rows
+      : rows.filter((c) => c.id === session.committeeId);
 
     return Response.json(visible);
   } catch (err) {

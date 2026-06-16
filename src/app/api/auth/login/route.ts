@@ -2,6 +2,7 @@ import { compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { authErrorResponse, getSession } from "@/lib/session";
+import { normalizePermissions, type UserRole } from "@/lib/permissions";
 
 export async function POST(request: Request) {
   try {
@@ -47,9 +48,11 @@ export async function POST(request: Request) {
     }
 
     const session = await getSession();
+    const permissions = normalizePermissions(user.permissions ?? []);
     session.userId = user.id;
     session.username = user.username;
-    session.role = user.role as "admin" | "chair";
+    session.role = user.role as UserRole;
+    session.permissions = permissions;
     session.conferenceId = user.conferenceId;
     session.committeeId = user.committeeId ?? null;
     session.displayName = user.displayName;
@@ -59,6 +62,7 @@ export async function POST(request: Request) {
       userId: user.id,
       username: user.username,
       role: user.role,
+      permissions,
       committeeId: user.committeeId ?? null,
       displayName: user.displayName,
     });

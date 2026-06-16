@@ -1,17 +1,31 @@
 import { and, eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { db, committees, users } from "@/db";
-import { authErrorResponse, requireAdmin } from "@/lib/session";
+import { authErrorResponse, requirePermission } from "@/lib/session";
+import {
+  detectRoleFromPermissions,
+  normalizePermissions,
+  type Permission,
+  type UserRole,
+} from "@/lib/permissions";
+
+function isUserRole(value: unknown): value is UserRole {
+  return (
+    value === "admin" ||
+    value === "chair" ||
+    value === "registrar" ||
+    value === "custom"
+  );
+}
 
 // PATCH /api/admin/users/[id]
-// Update a user's display name, committee assignment, or password
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const session = await requireAdmin();
+    const session = await requirePermission("users:manage");
     let body: unknown;
     try {
       body = await request.json();
@@ -25,12 +39,16 @@ export async function PATCH(
       displayName?: unknown;
       committeeId?: unknown;
       password?: unknown;
+      role?: unknown;
+      permissions?: unknown;
     };
 
     const updates: {
       displayName?: string;
       committeeId?: string | null;
       passwordHash?: string;
+      role?: UserRole;
+      permissions?: Permission[];
     } = {};
 
     if (typeof payload.displayName === "string") {
@@ -64,6 +82,25 @@ export async function PATCH(
     if (typeof payload.password === "string" && payload.password) {
       updates.passwordHash = await hash(payload.password, 12);
     }
+    if (Array.isArray(payload.permissions)) {
+      const permissions = normalizePermissions(
+        payload.permissions.filter((p) => typeof p === "string")
+      );
+      if (permissions.length === 0) {
+        return Response.json(
+          { error: "At least one permission is required" },
+          { status: 400 }
+        );
+      }
+      updates.permissions = permissions;
+      updates.role = isUserRole(payload.role)
+        ? payload.role === "custom"
+          ? detectRoleFromPermissions(permissions)
+          : payload.role
+        : detectRoleFromPermissions(permissions);
+    } else if (isUserRole(payload.role)) {
+      updates.role = payload.role;
+    }
 
     if (Object.keys(updates).length === 0) {
       return Response.json({ error: "No valid fields to update" }, { status: 400 });
@@ -73,15 +110,13 @@ export async function PATCH(
       .update(users)
       .set(updates)
       .where(
-        and(
-          eq(users.id, id),
-          eq(users.conferenceId, session.conferenceId)
-        )
+        and(eq(users.id, id), eq(users.conferenceId, session.conferenceId))
       )
       .returning({
         id: users.id,
         username: users.username,
         role: users.role,
+        permissions: users.permissions,
         committeeId: users.committeeId,
         displayName: users.displayName,
       });
@@ -90,23 +125,24 @@ export async function PATCH(
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 
-    return Response.json(updated);
+    return Response.json({
+      ...updated,
+      permissions: normalizePermissions(updated.permissions ?? []),
+    });
   } catch (err) {
     return authErrorResponse(err);
   }
 }
 
 // DELETE /api/admin/users/[id]
-// Remove a user account
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const session = await requireAdmin();
+    const session = await requirePermission("users:manage");
 
-    // Prevent admin from deleting their own account
     if (id === session.userId) {
       return Response.json(
         { error: "Cannot delete your own account" },
@@ -117,10 +153,7 @@ export async function DELETE(
     const deleted = await db
       .delete(users)
       .where(
-        and(
-          eq(users.id, id),
-          eq(users.conferenceId, session.conferenceId)
-        )
+        and(eq(users.id, id), eq(users.conferenceId, session.conferenceId))
       )
       .returning({ id: users.id });
 

@@ -13,10 +13,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/context/AuthContext";
 import { computeRubricTotal, createEmptyRubricScore } from "@/lib/scoring";
-import {
-  exportConferenceJson,
-  importConferenceJson,
-} from "@/lib/storage";
+import { canAccessAllCommittees } from "@/lib/permissions";
 import type {
   Committee,
   CommitteeType,
@@ -181,8 +178,6 @@ interface ConferenceContextValue {
     notes?: string
   ) => void;
   setVcRecipient: (delegateId: string | undefined) => void;
-  exportJson: () => Promise<void>;
-  importJson: (file: File) => Promise<void>;
 }
 
 const ConferenceContext = createContext<ConferenceContextValue | null>(null);
@@ -276,7 +271,10 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         );
 
         // Auto-select and load the appropriate committee
-        if (user.role === "chair" && user.committeeId) {
+        if (
+          user.committeeId &&
+          !canAccessAllCommittees(user)
+        ) {
           setActiveCommitteeId(user.committeeId);
           await loadCommitteeData(user.committeeId);
         } else if (data.committees.length > 0) {
@@ -291,11 +289,11 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   }, [authLoading, user, loadCommitteeData]);
 
   // ---------------------------------------------------------------------------
-  // Admin polling: refresh active committee data every 15s
+  // Poll committee data for users who can switch across committees
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (!activeCommitteeId || user?.role !== "admin") return;
+    if (!activeCommitteeId || !user || !canAccessAllCommittees(user)) return;
     const interval = setInterval(() => {
       loadCommitteeData(activeCommitteeId);
     }, 15000);
@@ -855,85 +853,6 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   };
 
   // ---------------------------------------------------------------------------
-  // Export / Import
-  // ---------------------------------------------------------------------------
-
-  const exportJson = async () => {
-    if (!conference) return;
-    // Fetch all committee data to ensure export is complete
-    const rows = await Promise.all(
-      conference.committees.map((c) =>
-        fetch(`/api/committees/${c.id}`).then((r) => r.json())
-      )
-    );
-    const fullConference: Conference = {
-      ...conference,
-      committees: rows.map(rowToCommittee),
-    };
-    exportConferenceJson(fullConference);
-  };
-
-  const importJson = async (file: File) => {
-    const data = await importConferenceJson(file);
-
-    // Update conference metadata
-    await fetch("/api/conference", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: data.name, year: data.year }),
-    });
-
-    // Remove existing committees
-    const current = conferenceRef.current;
-    if (current) {
-      await Promise.all(
-        current.committees.map((c) =>
-          fetch(`/api/committees/${c.id}`, { method: "DELETE" })
-        )
-      );
-    }
-
-    // Create committees from import
-    const newRows = await Promise.all(
-      data.committees.map(async (c) => {
-        const r = await fetch("/api/committees", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: c.name,
-            type: c.type,
-            topic: c.topic,
-            withDefaults: false,
-          }),
-        });
-        const row: DbCommitteeRow = await r.json();
-        // Patch with full data from the import
-        const patchR = await fetch(`/api/committees/${row.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            version: row.version,
-            data: committeeToData(c),
-          }),
-        });
-        const updated: DbCommitteeRow = await patchR.json();
-        versions.current.set(updated.id, updated.version);
-        return updated;
-      })
-    );
-
-    const newCommittees = newRows.map(rowToCommittee);
-    const newConference: Conference = {
-      ...data,
-      committees: newCommittees,
-    };
-    setConference(newConference);
-    conferenceRef.current = newConference;
-    const firstId = newCommittees[0]?.id ?? null;
-    setActiveCommitteeId(firstId);
-  };
-
-  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -974,8 +893,6 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         signScores,
         updatePositionPaperScore,
         setVcRecipient,
-        exportJson,
-        importJson,
       }}
     >
       {children}

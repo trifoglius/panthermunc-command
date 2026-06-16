@@ -10,7 +10,6 @@ Conference management tool for [PantherMUNC](https://panthermunc.org), modeled a
 - **Delegate Management** — Add countries, track position paper status (EPP/LPP)
 - **Scoring** — Separate judge and dais rubrics (GA & Crisis), composite scores, discrepancy/tie detection per Awards Policies AP.1
 - **Stats & Export** — Speaking events, points, awards preview, Excel export per committee or full conference
-- **Backup/Restore** — JSON backup for data persistence between sessions
 
 ## Design
 
@@ -40,7 +39,7 @@ For **panthermunc.org**, you can host this as a subdomain (e.g. `command.panther
 
 ## Data Storage
 
-All data is stored in the browser's `localStorage`. Use **Backup JSON** regularly and **Export All Excel** for the Secretary of Analytics spreadsheet workflow (AP.1.7).
+Conference data is stored in a server database and synced per committee. Use **Export All Excel** or **Export All Conference Logs** on the Manage Conference page for backups and the Secretary of Analytics spreadsheet workflow (AP.1.7).
 
 ## Excel Export
 

@@ -18,6 +18,7 @@ import { StatsPanel } from "@/components/stats/StatsPanel";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import { hasPermission, canAccessAllCommittees } from "@/lib/permissions";
 import type { CommitteeType } from "@/lib/types";
 import { getVoteThresholds } from "@/lib/voting";
 
@@ -144,8 +145,15 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
 }
 
 function CommitteeWorkspace() {
+  const { user } = useAuth();
   const { activeCommittee } = useConference();
-  const [activeTab, setActiveTab] = useState<TabId>("delegates");
+  const defaultTab: TabId =
+    user &&
+    hasPermission(user, "scoring:edit") &&
+    !hasPermission(user, "committee:operate")
+      ? "scoring"
+      : "delegates";
+  const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
 
   if (!activeCommittee) return null;
 
@@ -249,7 +257,7 @@ export default function Home() {
       )}
 
       {noCommittees ? (
-        user?.role === "admin" ? (
+        user && hasPermission(user, "conference:manage") ? (
           <AdminSetupScreen />
         ) : (
           <div className="mx-auto max-w-2xl px-4 py-12 text-center">
@@ -268,7 +276,8 @@ export default function Home() {
       {!activeCommittee &&
         conference &&
         conference.committees.length > 0 &&
-        user?.role === "admin" && (
+        user &&
+        canAccessAllCommittees(user) && (
           <div className="mx-auto max-w-7xl px-4 py-6">
             <p className="text-purple-700">Select a committee above to begin.</p>
           </div>

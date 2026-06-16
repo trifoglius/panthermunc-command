@@ -2,17 +2,18 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import { canAccessAllCommittees, hasPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui";
 
 const TABS = [
-  { id: "delegates", label: "Delegates" },
-  { id: "rollcall", label: "Roll Call" },
-  { id: "motions", label: "Motions" },
-  { id: "motion_queues", label: "Motion Queues" },
-  { id: "documents", label: "Documents" },
-  { id: "points", label: "Points" },
-  { id: "scoring", label: "Scoring" },
-  { id: "stats", label: "Stats & Export" },
+  { id: "delegates", label: "Delegates", perm: "committee:operate" as const },
+  { id: "rollcall", label: "Roll Call", perm: "committee:operate" as const },
+  { id: "motions", label: "Motions", perm: "committee:operate" as const },
+  { id: "motion_queues", label: "Motion Queues", perm: "committee:operate" as const },
+  { id: "documents", label: "Documents", perm: "committee:operate" as const },
+  { id: "points", label: "Points", perm: "committee:operate" as const },
+  { id: "scoring", label: "Scoring", perm: "scoring:edit" as const },
+  { id: "stats", label: "Stats & Export", perm: "committee:operate" as const },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
@@ -27,15 +28,16 @@ export function CommitteeNav({
   const { user } = useAuth();
   const { conference, activeCommittee, selectCommittee } = useConference();
 
-  if (!conference) return null;
+  if (!conference || !user) return null;
 
-  const isAdmin = user?.role === "admin";
+  const showAllCommittees = canAccessAllCommittees(user);
+  const visibleTabs = TABS.filter((tab) => hasPermission(user, tab.perm));
 
   return (
     <nav className="border-b border-purple-200 bg-purple-50">
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex flex-wrap items-center gap-2 py-3">
-          {isAdmin ? (
+          {showAllCommittees ? (
             <>
               <span className="mr-2 text-sm font-medium text-purple-800">
                 Committee:
@@ -61,9 +63,9 @@ export function CommitteeNav({
             )
           )}
         </div>
-        {activeCommittee && (
+        {activeCommittee && visibleTabs.length > 0 && (
           <div className="flex flex-wrap gap-1 border-t border-purple-200 py-2">
-            {TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"

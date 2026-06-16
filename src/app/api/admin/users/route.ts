@@ -1,19 +1,45 @@
 import { and, eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { db, committees, users } from "@/db";
-import { authErrorResponse, requireAdmin } from "@/lib/session";
+import { authErrorResponse, requirePermission } from "@/lib/session";
+import {
+  detectRoleFromPermissions,
+  normalizePermissions,
+  permissionsForRole,
+  type Permission,
+  type UserRole,
+} from "@/lib/permissions";
+
+function parsePermissions(
+  role: UserRole,
+  raw?: unknown
+): Permission[] {
+  if (Array.isArray(raw)) {
+    return normalizePermissions(raw.filter((p) => typeof p === "string"));
+  }
+  return permissionsForRole(role);
+}
+
+function isUserRole(value: unknown): value is UserRole {
+  return (
+    value === "admin" ||
+    value === "chair" ||
+    value === "registrar" ||
+    value === "custom"
+  );
+}
 
 // GET /api/admin/users
-// List all users for this conference
 export async function GET() {
   try {
-    const session = await requireAdmin();
+    const session = await requirePermission("users:manage");
 
     const rows = await db
       .select({
         id: users.id,
         username: users.username,
         role: users.role,
+        permissions: users.permissions,
         committeeId: users.committeeId,
         displayName: users.displayName,
         createdAt: users.createdAt,
@@ -21,17 +47,21 @@ export async function GET() {
       .from(users)
       .where(eq(users.conferenceId, session.conferenceId));
 
-    return Response.json(rows);
+    return Response.json(
+      rows.map((row) => ({
+        ...row,
+        permissions: normalizePermissions(row.permissions ?? []),
+      }))
+    );
   } catch (err) {
     return authErrorResponse(err);
   }
 }
 
 // POST /api/admin/users
-// Create a new chair (or admin) account
 export async function POST(request: Request) {
   try {
-    const session = await requireAdmin();
+    const session = await requirePermission("users:manage");
     let body: unknown;
     try {
       body = await request.json();
@@ -45,6 +75,7 @@ export async function POST(request: Request) {
       username?: unknown;
       password?: unknown;
       role?: unknown;
+      permissions?: unknown;
       committeeId?: unknown;
       displayName?: unknown;
     };
@@ -61,13 +92,28 @@ export async function POST(request: Request) {
       );
     }
 
-    if (payload.role !== "admin" && payload.role !== "chair") {
+    if (!isUserRole(payload.role)) {
       return Response.json({ error: "Invalid role" }, { status: 400 });
     }
 
-    if (payload.role === "chair" && !payload.committeeId) {
+    const role = payload.role;
+    const permissions = parsePermissions(role, payload.permissions);
+
+    if (permissions.length === 0) {
       return Response.json(
-        { error: "committeeId is required for chairs" },
+        { error: "At least one permission is required" },
+        { status: 400 }
+      );
+    }
+
+    const needsCommittee =
+      role === "chair" ||
+      (permissions.includes("committee:operate") &&
+        !permissions.includes("committee:access_all"));
+
+    if (needsCommittee && !payload.committeeId) {
+      return Response.json(
+        { error: "committeeId is required for committee-scoped users" },
         { status: 400 }
       );
     }
@@ -91,6 +137,9 @@ export async function POST(request: Request) {
       }
     }
 
+    const storedRole =
+      role === "custom" ? detectRoleFromPermissions(permissions) : role;
+
     const passwordHash = await hash(payload.password, 12);
 
     const [user] = await db
@@ -99,7 +148,8 @@ export async function POST(request: Request) {
         conferenceId: session.conferenceId,
         username: payload.username.trim().toLowerCase(),
         passwordHash,
-        role: payload.role,
+        role: storedRole,
+        permissions,
         committeeId:
           typeof payload.committeeId === "string" ? payload.committeeId : null,
         displayName:
@@ -111,14 +161,20 @@ export async function POST(request: Request) {
         id: users.id,
         username: users.username,
         role: users.role,
+        permissions: users.permissions,
         committeeId: users.committeeId,
         displayName: users.displayName,
         createdAt: users.createdAt,
       });
 
-    return Response.json(user, { status: 201 });
+    return Response.json(
+      {
+        ...user,
+        permissions: normalizePermissions(user.permissions ?? []),
+      },
+      { status: 201 }
+    );
   } catch (err: unknown) {
-    // Unique constraint violation
     if (
       err instanceof Error &&
       err.message.includes("users_username_unique")

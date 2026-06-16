@@ -8,6 +8,7 @@ import {
   check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import type { Permission } from "@/lib/permissions";
 import type {
   Delegate,
   RollCallSession,
@@ -84,7 +85,8 @@ export const users = pgTable(
       .references(() => conferences.id, { onDelete: "cascade" }),
     username: text("username").notNull().unique(),
     passwordHash: text("password_hash").notNull(),
-    role: text("role").notNull(), // "admin" | "chair"
+    role: text("role").notNull(), // "admin" | "chair" | "registrar" | "custom"
+    permissions: jsonb("permissions").$type<Permission[]>().notNull().default([]),
     committeeId: uuid("committee_id")
       .references(() => committees.id, { onDelete: "set null" })
       .default(sql`NULL`),
@@ -93,7 +95,12 @@ export const users = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [check("role_check", sql`${t.role} IN ('admin', 'chair')`)]
+  (t) => [
+    check(
+      "role_check",
+      sql`${t.role} IN ('admin', 'chair', 'registrar', 'custom')`
+    ),
+  ]
 );
 
 // ---------------------------------------------------------------------------

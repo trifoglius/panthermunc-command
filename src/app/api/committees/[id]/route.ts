@@ -3,9 +3,12 @@ import { db, committees } from "@/db";
 import type { CommitteeData } from "@/db/schema";
 import {
   authErrorResponse,
+  AuthError,
   requireAdmin,
   requireCommitteeAccess,
 } from "@/lib/session";
+import { applyCommitteeDataUpdate } from "@/lib/committee-access";
+import { canOperateCommittee } from "@/lib/permissions";
 
 // GET /api/committees/[id]
 // Returns full committee data including JSONB payload
@@ -43,7 +46,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    await requireCommitteeAccess(id);
+    const session = await requireCommitteeAccess(id);
 
     const body = await request.json();
 
@@ -82,12 +85,27 @@ export async function PATCH(
     };
 
     if (body.data !== undefined) {
-      updates.data = body.data as CommitteeData;
+      try {
+        updates.data = applyCommitteeDataUpdate(
+          current.data,
+          body.data as Partial<CommitteeData>,
+          session,
+          id
+        );
+      } catch {
+        throw new AuthError("Not authorized to modify committee data", 403);
+      }
     }
     if (typeof body.name === "string" && body.name.trim()) {
+      if (!canOperateCommittee(session, id)) {
+        throw new AuthError("Not authorized to rename committee", 403);
+      }
       updates.name = body.name.trim();
     }
     if (typeof body.topic === "string") {
+      if (!canOperateCommittee(session, id)) {
+        throw new AuthError("Not authorized to edit committee topic", 403);
+      }
       updates.topic = body.topic.trim();
     }
 

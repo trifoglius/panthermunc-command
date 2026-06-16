@@ -2,17 +2,47 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { PermissionEditor } from "@/components/admin/PermissionEditor";
 import { Header } from "@/components/layout/Header";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import {
+  hasPermission,
+  permissionsForRole,
+  ROLE_LABELS,
+  type Permission,
+  type UserRole,
+} from "@/lib/permissions";
 
 interface UserRow {
   id: string;
   username: string;
-  role: "admin" | "chair";
+  role: UserRole;
+  permissions: Permission[];
   committeeId: string | null;
   displayName: string;
+}
+
+function needsCommitteeAssignment(role: UserRole, permissions: Permission[]) {
+  return (
+    role === "chair" ||
+    (permissions.includes("committee:operate") &&
+      !permissions.includes("committee:access_all"))
+  );
+}
+
+function roleBadgeClass(role: UserRole) {
+  switch (role) {
+    case "admin":
+      return "bg-purple-100 text-purple-800";
+    case "chair":
+      return "bg-blue-100 text-blue-800";
+    case "registrar":
+      return "bg-amber-100 text-amber-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
 }
 
 export default function AdminUsersPage() {
@@ -23,40 +53,50 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
-  // New user form
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newDisplayName, setNewDisplayName] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "chair">("chair");
+  const [newRole, setNewRole] = useState<UserRole>("chair");
+  const [newPermissions, setNewPermissions] = useState<Permission[]>(
+    permissionsForRole("chair")
+  );
   const [newCommitteeId, setNewCommitteeId] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  // Edit state: per-user temp password field
   const [editPasswords, setEditPasswords] = useState<Record<string, string>>({});
   const [editCommittees, setEditCommittees] = useState<Record<string, string>>({});
+  const [editRoles, setEditRoles] = useState<Record<string, UserRole>>({});
+  const [editPermissions, setEditPermissions] = useState<
+    Record<string, Permission[]>
+  >({});
+  const [savingPermissions, setSavingPermissions] = useState<string | null>(null);
 
-  // Guard: admin only
   useEffect(() => {
     if (authLoading) return;
-    if (!user || user.role !== "admin") router.replace("/");
+    if (!user || !hasPermission(user, "users:manage")) router.replace("/");
   }, [user, authLoading, router]);
 
-  // Load users
   useEffect(() => {
-    if (!user || user.role !== "admin") return;
+    if (!user || !hasPermission(user, "users:manage")) return;
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((data: UserRow[]) => {
         setUsers(data);
         const initPass: Record<string, string> = {};
         const initComm: Record<string, string> = {};
+        const initRoles: Record<string, UserRole> = {};
+        const initPerms: Record<string, Permission[]> = {};
         data.forEach((u) => {
           initPass[u.id] = "";
           initComm[u.id] = u.committeeId ?? "";
+          initRoles[u.id] = u.role;
+          initPerms[u.id] = u.permissions;
         });
         setEditPasswords(initPass);
         setEditCommittees(initComm);
+        setEditRoles(initRoles);
+        setEditPermissions(initPerms);
       })
       .finally(() => setLoadingUsers(false));
   }, [user]);
@@ -64,8 +104,12 @@ export default function AdminUsersPage() {
   const handleCreate = async () => {
     setCreateError("");
     if (!newUsername.trim() || !newPassword) return;
-    if (newRole === "chair" && !newCommitteeId) {
-      setCreateError("Chairs must be assigned to a committee.");
+    if (needsCommitteeAssignment(newRole, newPermissions) && !newCommitteeId) {
+      setCreateError("Committee-scoped users must be assigned to a committee.");
+      return;
+    }
+    if (newPermissions.length === 0) {
+      setCreateError("Select at least one permission.");
       return;
     }
     setCreating(true);
@@ -78,7 +122,11 @@ export default function AdminUsersPage() {
           password: newPassword,
           displayName: newDisplayName.trim() || newUsername.trim(),
           role: newRole,
-          committeeId: newRole === "admin" ? null : newCommitteeId || null,
+          permissions: newPermissions,
+          committeeId:
+            needsCommitteeAssignment(newRole, newPermissions)
+              ? newCommitteeId || null
+              : null,
         }),
       });
       const data = await r.json();
@@ -86,13 +134,23 @@ export default function AdminUsersPage() {
         setCreateError(data.error ?? "Failed to create user");
         return;
       }
-      setUsers((prev) => [...prev, data as UserRow]);
-      setEditPasswords((prev) => ({ ...prev, [data.id]: "" }));
-      setEditCommittees((prev) => ({ ...prev, [data.id]: data.committeeId ?? "" }));
+      const created = data as UserRow;
+      setUsers((prev) => [...prev, created]);
+      setEditPasswords((prev) => ({ ...prev, [created.id]: "" }));
+      setEditCommittees((prev) => ({
+        ...prev,
+        [created.id]: created.committeeId ?? "",
+      }));
+      setEditRoles((prev) => ({ ...prev, [created.id]: created.role }));
+      setEditPermissions((prev) => ({
+        ...prev,
+        [created.id]: created.permissions,
+      }));
       setNewUsername("");
       setNewPassword("");
       setNewDisplayName("");
       setNewRole("chair");
+      setNewPermissions(permissionsForRole("chair"));
       setNewCommitteeId("");
     } finally {
       setCreating(false);
@@ -109,6 +167,28 @@ export default function AdminUsersPage() {
     if (r.ok) {
       const updated: UserRow = await r.json();
       setUsers((prev) => prev.map((u) => (u.id === uid ? updated : u)));
+    }
+  };
+
+  const handleSavePermissions = async (uid: string) => {
+    setSavingPermissions(uid);
+    try {
+      const r = await fetch(`/api/admin/users/${uid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: editRoles[uid],
+          permissions: editPermissions[uid],
+        }),
+      });
+      if (r.ok) {
+        const updated: UserRow = await r.json();
+        setUsers((prev) => prev.map((u) => (u.id === uid ? updated : u)));
+        setEditRoles((prev) => ({ ...prev, [uid]: updated.role }));
+        setEditPermissions((prev) => ({ ...prev, [uid]: updated.permissions }));
+      }
+    } finally {
+      setSavingPermissions(null);
     }
   };
 
@@ -147,7 +227,7 @@ export default function AdminUsersPage() {
     );
   }
 
-  if (!user || user.role !== "admin") return null;
+  if (!user || !hasPermission(user, "users:manage")) return null;
 
   return (
     <div className="min-h-screen bg-purple-50">
@@ -160,20 +240,19 @@ export default function AdminUsersPage() {
           </Button>
         </div>
 
-        {/* Create user */}
         <Card title="Add User">
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
               label="Username"
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
-              placeholder="e.g. sc_chair"
+              placeholder="e.g. registrar"
             />
             <Input
               label="Display Name"
               value={newDisplayName}
               onChange={(e) => setNewDisplayName(e.target.value)}
-              placeholder="e.g. Security Council Chair"
+              placeholder="e.g. Awards Registrar"
             />
             <Input
               label="Password"
@@ -181,16 +260,7 @@ export default function AdminUsersPage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
-            <Select
-              label="Role"
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value as "admin" | "chair")}
-              options={[
-                { value: "chair", label: "Chair" },
-                { value: "admin", label: "Admin" },
-              ]}
-            />
-            {newRole === "chair" && (
+            {needsCommitteeAssignment(newRole, newPermissions) && (
               <Select
                 label="Committee"
                 value={newCommitteeId}
@@ -198,6 +268,17 @@ export default function AdminUsersPage() {
                 options={committeeOptions}
               />
             )}
+          </div>
+          <div className="mt-4">
+            <p className="mb-2 text-sm font-medium text-purple-900">
+              User class &amp; permissions
+            </p>
+            <PermissionEditor
+              role={newRole}
+              permissions={newPermissions}
+              onRoleChange={setNewRole}
+              onPermissionsChange={setNewPermissions}
+            />
           </div>
           {createError && (
             <p className="mt-2 text-sm text-red-600">{createError}</p>
@@ -212,92 +293,122 @@ export default function AdminUsersPage() {
           </div>
         </Card>
 
-        {/* User list */}
         <Card title="Users">
           {users.length === 0 ? (
             <p className="text-sm text-purple-600">No users yet.</p>
           ) : (
             <ul className="divide-y divide-purple-100">
-              {users.map((u) => (
-                <li key={u.id} className="py-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <span className="font-medium text-purple-900">
-                      {u.displayName}
-                    </span>
-                    <span className="text-sm text-purple-500">@{u.username}</span>
-                    <span
-                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                        u.role === "admin"
-                          ? "bg-purple-100 text-purple-800"
-                          : "bg-blue-100 text-blue-800"
-                      }`}
-                    >
-                      {u.role}
-                    </span>
-                    {u.committeeId && (
-                      <span className="text-xs text-gray-500">
-                        {conference?.committees.find(
-                          (c) => c.id === u.committeeId
-                        )?.name ?? u.committeeId}
+              {users.map((u) => {
+                const perms = editPermissions[u.id] ?? u.permissions;
+                const role = editRoles[u.id] ?? u.role;
+                const showCommittee = needsCommitteeAssignment(role, perms);
+                return (
+                  <li key={u.id} className="py-4">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-purple-900">
+                        {u.displayName}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {u.role === "chair" && (
-                      <div className="flex items-end gap-1">
-                        <Select
-                          label=""
-                          value={editCommittees[u.id] ?? u.committeeId ?? ""}
-                          onChange={(e) =>
-                            setEditCommittees((prev) => ({
-                              ...prev,
-                              [u.id]: e.target.value,
-                            }))
-                          }
-                          options={committeeOptions}
-                        />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleUpdateCommittee(u.id)}
-                        >
-                          Reassign
-                        </Button>
-                      </div>
-                    )}
-                    <div className="flex items-end gap-1">
-                      <Input
-                        placeholder="New password"
-                        type="password"
-                        value={editPasswords[u.id] ?? ""}
-                        onChange={(e) =>
-                          setEditPasswords((prev) => ({
+                      <span className="text-sm text-purple-500">
+                        @{u.username}
+                      </span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-xs font-medium ${roleBadgeClass(role)}`}
+                      >
+                        {ROLE_LABELS[role] ?? role}
+                      </span>
+                      {u.committeeId && (
+                        <span className="text-xs text-gray-500">
+                          {conference?.committees.find(
+                            (c) => c.id === u.committeeId
+                          )?.name ?? u.committeeId}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mb-3 rounded-md border border-purple-100 bg-purple-50/50 p-3">
+                      <PermissionEditor
+                        role={role}
+                        permissions={perms}
+                        onRoleChange={(nextRole) =>
+                          setEditRoles((prev) => ({ ...prev, [u.id]: nextRole }))
+                        }
+                        onPermissionsChange={(nextPerms) =>
+                          setEditPermissions((prev) => ({
                             ...prev,
-                            [u.id]: e.target.value,
+                            [u.id]: nextPerms,
                           }))
                         }
                       />
                       <Button
                         variant="secondary"
                         size="sm"
-                        disabled={!editPasswords[u.id]}
-                        onClick={() => handleResetPassword(u.id)}
+                        className="mt-2"
+                        disabled={savingPermissions === u.id}
+                        onClick={() => handleSavePermissions(u.id)}
                       >
-                        Reset PW
+                        {savingPermissions === u.id
+                          ? "Saving..."
+                          : "Save Permissions"}
                       </Button>
                     </div>
-                    {u.id !== user.userId && (
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDelete(u.id)}
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
+
+                    <div className="flex flex-wrap gap-2">
+                      {showCommittee && (
+                        <div className="flex items-end gap-1">
+                          <Select
+                            label=""
+                            value={editCommittees[u.id] ?? u.committeeId ?? ""}
+                            onChange={(e) =>
+                              setEditCommittees((prev) => ({
+                                ...prev,
+                                [u.id]: e.target.value,
+                              }))
+                            }
+                            options={committeeOptions}
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleUpdateCommittee(u.id)}
+                          >
+                            Reassign
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex items-end gap-1">
+                        <Input
+                          placeholder="New password"
+                          type="password"
+                          value={editPasswords[u.id] ?? ""}
+                          onChange={(e) =>
+                            setEditPasswords((prev) => ({
+                              ...prev,
+                              [u.id]: e.target.value,
+                            }))
+                          }
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={!editPasswords[u.id]}
+                          onClick={() => handleResetPassword(u.id)}
+                        >
+                          Reset PW
+                        </Button>
+                      </div>
+                      {u.id !== user.userId && (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => handleDelete(u.id)}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>

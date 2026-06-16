@@ -150,3 +150,31 @@ export function Textarea({
     </label>
   );
 }
+
+export function Checkbox({
+  label,
+  description,
+  className = "",
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: string;
+  description?: string;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer items-start gap-2 rounded-md border border-purple-100 px-3 py-2 hover:bg-purple-50 ${className}`}
+    >
+      <input
+        type="checkbox"
+        className="mt-1 h-4 w-4 rounded border-purple-300 text-purple-700 focus:ring-purple-500"
+        {...props}
+      />
+      <span>
+        <span className="block text-sm font-medium text-purple-900">{label}</span>
+        {description && (
+          <span className="block text-xs text-purple-600">{description}</span>
+        )}
+      </span>
+    </label>
+  );
+}

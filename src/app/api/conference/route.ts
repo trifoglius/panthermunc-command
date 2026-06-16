@@ -5,6 +5,7 @@ import {
   requireAdmin,
   requireSession,
 } from "@/lib/session";
+import { canAccessAllCommittees } from "@/lib/permissions";
 
 // GET /api/conference
 // Returns conference metadata + committee list (scoped to role)
@@ -34,11 +35,10 @@ export async function GET() {
       .from(committees)
       .where(eq(committees.conferenceId, session.conferenceId));
 
-    // Chairs only see their assigned committee
-    const visibleCommittees =
-      session.role === "admin"
-        ? allCommittees
-        : allCommittees.filter((c) => c.id === session.committeeId);
+    // Users with access_all see every committee; chairs see only their assignment
+    const visibleCommittees = canAccessAllCommittees(session)
+      ? allCommittees
+      : allCommittees.filter((c) => c.id === session.committeeId);
 
     return Response.json({ ...conference, committees: visibleCommittees });
   } catch (err) {
