@@ -6,20 +6,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { DEFAULT_DELEGATES_GA } from "@/lib/constants";
+import { useAuth } from "@/context/AuthContext";
 import { computeRubricTotal, createEmptyRubricScore } from "@/lib/scoring";
 import {
   exportConferenceJson,
   importConferenceJson,
-  loadConference,
-  saveConference,
-  clearConference as clearStoredConference,
 } from "@/lib/storage";
-import { hashPassword, verifyPassword } from "@/lib/password";
 import type {
   Committee,
   CommitteeType,
@@ -36,24 +33,109 @@ import type {
   ScorerRole,
   SpeakingEvent,
 } from "@/lib/types";
+import type { CommitteeData } from "@/db/schema";
 import { isFormalSpeakingMotion } from "@/lib/motion-timers";
+
+// ---------------------------------------------------------------------------
+// Data shape helpers
+// ---------------------------------------------------------------------------
+
+function committeeToData(c: Committee): CommitteeData {
+  return {
+    delegates: c.delegates,
+    rollCalls: c.rollCalls,
+    motions: c.motions,
+    motionQueueHistory: c.motionQueueHistory ?? [],
+    motionSessionState: c.motionSessionState ?? {},
+    documents: c.documents,
+    speakingEvents: c.speakingEvents,
+    points: c.points,
+    judgeScores: c.judgeScores,
+    daisScores: c.daisScores,
+    positionPaperScores: c.positionPaperScores,
+    vcRecipientId: c.vcRecipientId,
+    discrepancyThreshold: c.discrepancyThreshold,
+    requirePositionPapers: c.requirePositionPapers,
+  };
+}
+
+type DbCommitteeRow = {
+  id: string;
+  name: string;
+  type: string;
+  topic: string;
+  data: CommitteeData;
+  createdAt: string | Date;
+  version: number;
+};
+
+function rowToCommittee(row: DbCommitteeRow): Committee {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type as CommitteeType,
+    topic: row.topic,
+    createdAt:
+      typeof row.createdAt === "string"
+        ? row.createdAt
+        : row.createdAt.toISOString(),
+    ...row.data,
+  };
+}
+
+function emptyCommitteeStub(row: {
+  id: string;
+  name: string;
+  type: string;
+  topic: string;
+  createdAt: string | Date;
+}): Committee {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type as CommitteeType,
+    topic: row.topic,
+    createdAt:
+      typeof row.createdAt === "string"
+        ? row.createdAt
+        : (row.createdAt as Date).toISOString(),
+    delegates: [],
+    rollCalls: [],
+    motions: [],
+    motionQueueHistory: [],
+    motionSessionState: {},
+    documents: [],
+    speakingEvents: [],
+    points: [],
+    judgeScores: [],
+    daisScores: [],
+    positionPaperScores: [],
+    discrepancyThreshold: 10,
+    requirePositionPapers: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Context interface
+// ---------------------------------------------------------------------------
 
 interface ConferenceContextValue {
   conference: Conference | null;
   activeCommittee: Committee | null;
   loading: boolean;
-  initConference: (name: string, year: number, password: string) => Promise<void>;
-  updateConference: (updates: { name?: string; year?: number }) => void;
-  removeCommittee: (id: string) => void;
-  deleteConference: () => void;
-  verifyManagementPassword: (password: string) => Promise<boolean>;
+  syncError: string | null;
+  clearSyncError: () => void;
+  initConference: (name: string, year: number) => Promise<void>;
+  updateConference: (updates: { name?: string; year?: number }) => Promise<void>;
+  removeCommittee: (id: string) => Promise<void>;
+  deleteConference: () => Promise<void>;
   createCommittee: (
     name: string,
     type: CommitteeType,
     topic: string,
     withDefaults?: boolean
-  ) => string;
-  selectCommittee: (id: string | null) => void;
+  ) => Promise<string>;
+  selectCommittee: (id: string | null) => Promise<void>;
   updateCommittee: (committee: Committee) => void;
   addDelegate: (
     country: string,
@@ -75,9 +157,7 @@ interface ConferenceContextValue {
   addDocument: (doc: Omit<Document, "id" | "amendments">) => void;
   updateDocument: (doc: Document) => void;
   promoteToDraftResolution: (workingPaperId: string) => void;
-  addSpeakingEvent: (
-    event: Omit<SpeakingEvent, "id" | "timestamp">
-  ) => void;
+  addSpeakingEvent: (event: Omit<SpeakingEvent, "id" | "timestamp">) => void;
   addPoint: (point: Omit<Point, "id" | "timestamp" | "resolved">) => void;
   resolvePoint: (id: string) => void;
   updateRubricScore: (
@@ -93,90 +173,126 @@ interface ConferenceContextValue {
     notes?: string
   ) => void;
   setVcRecipient: (delegateId: string | undefined) => void;
-  exportJson: () => void;
+  exportJson: () => Promise<void>;
   importJson: (file: File) => Promise<void>;
 }
 
 const ConferenceContext = createContext<ConferenceContextValue | null>(null);
 
-function createDefaultConference(
-  name: string,
-  year: number,
-  managementPasswordHash?: string
-): Conference {
-  const now = new Date().toISOString();
-  return {
-    id: uuidv4(),
-    name,
-    year,
-    managementPasswordHash,
-    committees: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-function createDefaultCommittee(
-  name: string,
-  type: CommitteeType,
-  topic: string,
-  withDefaults: boolean
-): Committee {
-  const delegates: Delegate[] = withDefaults
-    ? DEFAULT_DELEGATES_GA.map((country) => ({
-        id: uuidv4(),
-        country,
-        delegateName: "",
-        positionPaperStatus: "none" as const,
-      }))
-    : [];
-
-  const judgeScores = delegates.map((d) => createEmptyRubricScore(d.id, type));
-  const daisScores = delegates.map((d) => createEmptyRubricScore(d.id, type));
-
-  return {
-    id: uuidv4(),
-    name,
-    type,
-    topic,
-    delegates,
-    rollCalls: [],
-    motions: [],
-    motionQueueHistory: [],
-    motionSessionState: {},
-    documents: [],
-    speakingEvents: [],
-    points: [],
-    judgeScores,
-    daisScores,
-    positionPaperScores: [],
-    discrepancyThreshold: 10,
-    requirePositionPapers: type === "ga",
-    createdAt: new Date().toISOString(),
-  };
-}
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
 
 export function ConferenceProvider({ children }: { children: ReactNode }) {
-  const [conference, setConference] = useState<Conference | null>(null);
-  const [activeCommitteeId, setActiveCommitteeId] = useState<string | null>(
-    null
-  );
-  const [loading, setLoading] = useState(true);
+  const { user, authLoading } = useAuth();
 
+  const [conference, setConference] = useState<Conference | null>(null);
+  const [activeCommitteeId, setActiveCommitteeId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Keep a stable ref to latest conference for debounced callbacks
+  const conferenceRef = useRef<Conference | null>(null);
   useEffect(() => {
-    const saved = loadConference();
-    if (saved) {
-      setConference(saved);
-      if (saved.committees.length > 0) {
-        setActiveCommitteeId(saved.committees[0].id);
-      }
+    conferenceRef.current = conference;
+  }, [conference]);
+
+  // Per-committee version tracking (incremented by server on each write)
+  const versions = useRef<Map<string, number>>(new Map());
+
+  // Debounce timers for persisting committee data
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // ---------------------------------------------------------------------------
+  // Load committee full data
+  // ---------------------------------------------------------------------------
+
+  const loadCommitteeData = useCallback(async (id: string) => {
+    try {
+      const r = await fetch(`/api/committees/${id}`);
+      if (!r.ok) return;
+      const row: DbCommitteeRow = await r.json();
+      versions.current.set(id, row.version);
+      const committee = rowToCommittee(row);
+      setConference((prev) => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          committees: prev.committees.map((c) => (c.id === id ? committee : c)),
+        };
+        conferenceRef.current = updated;
+        return updated;
+      });
+    } catch {
+      // non-fatal
     }
-    setLoading(false);
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Load conference on mount (after auth resolves)
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    if (conference) saveConference(conference);
-  }, [conference]);
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    (async () => {
+      try {
+        const r = await fetch("/api/conference");
+        if (!r.ok) {
+          setLoading(false);
+          return;
+        }
+        const data = await r.json();
+        // data = { id, name, year, createdAt, updatedAt, committees: [{id, name, type, topic, version, createdAt}] }
+
+        const conf: Conference = {
+          id: data.id,
+          name: data.name,
+          year: data.year,
+          committees: data.committees.map(emptyCommitteeStub),
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        };
+        setConference(conf);
+        conferenceRef.current = conf;
+        data.committees.forEach((c: { id: string; version: number }) =>
+          versions.current.set(c.id, c.version)
+        );
+
+        // Auto-select and load the appropriate committee
+        if (user.role === "chair" && user.committeeId) {
+          setActiveCommitteeId(user.committeeId);
+          await loadCommitteeData(user.committeeId);
+        } else if (data.committees.length > 0) {
+          const firstId = data.committees[0].id;
+          setActiveCommitteeId(firstId);
+          await loadCommitteeData(firstId);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [authLoading, user, loadCommitteeData]);
+
+  // ---------------------------------------------------------------------------
+  // Admin polling: refresh active committee data every 15s
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (!activeCommitteeId || user?.role !== "admin") return;
+    const interval = setInterval(() => {
+      loadCommitteeData(activeCommitteeId);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [activeCommitteeId, user, loadCommitteeData]);
+
+  // ---------------------------------------------------------------------------
+  // Active committee memo
+  // ---------------------------------------------------------------------------
 
   const activeCommittee = useMemo(
     () =>
@@ -184,19 +300,78 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     [conference, activeCommitteeId]
   );
 
+  // ---------------------------------------------------------------------------
+  // Persist committee data to API (debounced, 300ms)
+  // ---------------------------------------------------------------------------
+
+  const syncCommittee = useCallback(
+    (committeeId: string) => {
+      const conf = conferenceRef.current;
+      const committee = conf?.committees.find((c) => c.id === committeeId);
+      if (!committee) return;
+
+      const version = versions.current.get(committeeId) ?? 0;
+      fetch(`/api/committees/${committeeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version, data: committeeToData(committee) }),
+      })
+        .then(async (r) => {
+          if (r.ok) {
+            const row = await r.json();
+            versions.current.set(committeeId, row.version);
+          } else if (r.status === 409) {
+            const body = await r.json();
+            versions.current.set(
+              committeeId,
+              body.latest?.version ?? versions.current.get(committeeId) ?? 0
+            );
+            await loadCommitteeData(committeeId);
+            setSyncError(
+              "Another change was detected — your view has been refreshed."
+            );
+          }
+        })
+        .catch(() => {
+          setSyncError("Failed to save — check your connection.");
+        });
+    },
+    [loadCommitteeData]
+  );
+
+  const scheduleSave = useCallback(
+    (committeeId: string) => {
+      const existing = saveTimers.current.get(committeeId);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        saveTimers.current.delete(committeeId);
+        syncCommittee(committeeId);
+      }, 300);
+      saveTimers.current.set(committeeId, timer);
+    },
+    [syncCommittee]
+  );
+
+  // ---------------------------------------------------------------------------
+  // Core patch helper (applies locally + schedules save)
+  // ---------------------------------------------------------------------------
+
   const patchCommittee = useCallback(
     (committeeId: string, updater: (c: Committee) => Committee) => {
       setConference((prev) => {
         if (!prev) return prev;
-        return {
+        const updated = {
           ...prev,
           committees: prev.committees.map((c) =>
             c.id === committeeId ? updater(c) : c
           ),
         };
+        conferenceRef.current = updated;
+        return updated;
       });
+      scheduleSave(committeeId);
     },
-    []
+    [scheduleSave]
   );
 
   const requireCommittee = () => {
@@ -204,71 +379,103 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     return activeCommitteeId;
   };
 
-  const initConference = async (name: string, year: number, password: string) => {
-    const managementPasswordHash = await hashPassword(password);
-    const conf = createDefaultConference(name, year, managementPasswordHash);
-    setConference(conf);
-    setActiveCommitteeId(null);
-  };
+  // ---------------------------------------------------------------------------
+  // Conference-level mutations
+  // ---------------------------------------------------------------------------
 
-  const updateConference = (updates: { name?: string; year?: number }) => {
-    setConference((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      };
+  const initConference = async (name: string, year: number) => {
+    await fetch("/api/conference", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, year }),
     });
+    setConference((prev) => (prev ? { ...prev, name, year } : prev));
   };
 
-  const removeCommittee = (id: string) => {
-    const remaining =
-      conference?.committees.filter((c) => c.id !== id) ?? [];
-    if (activeCommitteeId === id) {
-      setActiveCommitteeId(remaining[0]?.id ?? null);
-    }
-    setConference((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        committees: prev.committees.filter((c) => c.id !== id),
-        updatedAt: new Date().toISOString(),
-      };
+  const updateConference = async (updates: { name?: string; year?: number }) => {
+    await fetch("/api/conference", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
     });
+    setConference((prev) => (prev ? { ...prev, ...updates } : prev));
   };
 
-  const deleteConference = () => {
-    clearStoredConference();
-    setConference(null);
-    setActiveCommitteeId(null);
-  };
-
-  const verifyManagementPassword = async (password: string) => {
-    if (!conference?.managementPasswordHash) return true;
-    return verifyPassword(password, conference.managementPasswordHash);
-  };
-
-  const createCommittee = (
+  const createCommittee = async (
     name: string,
     type: CommitteeType,
     topic: string,
     withDefaults = true
-  ) => {
-    const committee = createDefaultCommittee(name, type, topic, withDefaults);
-    setConference((prev) => {
-      const base = prev ?? createDefaultConference("PantherMUNC", new Date().getFullYear());
-      return { ...base, committees: [...base.committees, committee] };
+  ): Promise<string> => {
+    const r = await fetch("/api/committees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, type, topic, withDefaults }),
     });
-    setActiveCommitteeId(committee.id);
-    return committee.id;
+    if (!r.ok) throw new Error("Failed to create committee");
+    const row: DbCommitteeRow = await r.json();
+    versions.current.set(row.id, row.version);
+    const committee = rowToCommittee(row);
+    setConference((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, committees: [...prev.committees, committee] };
+      conferenceRef.current = updated;
+      return updated;
+    });
+    setActiveCommitteeId(row.id);
+    return row.id;
   };
 
-  const selectCommittee = (id: string | null) => setActiveCommitteeId(id);
+  const selectCommittee = async (id: string | null) => {
+    setActiveCommitteeId(id);
+    if (id) {
+      const already = conferenceRef.current?.committees.find((c) => c.id === id);
+      // Only fetch if we haven't loaded real data yet (delegates array is empty)
+      if (already && already.delegates.length === 0 && !versions.current.has(id)) {
+        await loadCommitteeData(id);
+      } else if (id && !already) {
+        await loadCommitteeData(id);
+      } else {
+        await loadCommitteeData(id); // always refresh on switch
+      }
+    }
+  };
 
   const updateCommittee = (committee: Committee) => {
     patchCommittee(committee.id, () => committee);
   };
+
+  const removeCommittee = async (id: string) => {
+    const remaining =
+      conferenceRef.current?.committees.filter((c) => c.id !== id) ?? [];
+    if (activeCommitteeId === id) {
+      const next = remaining[0]?.id ?? null;
+      setActiveCommitteeId(next);
+      if (next) await loadCommitteeData(next);
+    }
+    await fetch(`/api/committees/${id}`, { method: "DELETE" });
+    setConference((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        committees: prev.committees.filter((c) => c.id !== id),
+      };
+      conferenceRef.current = updated;
+      return updated;
+    });
+  };
+
+  const deleteConference = async () => {
+    await fetch("/api/conference", { method: "DELETE" });
+    setConference(null);
+    setActiveCommitteeId(null);
+    conferenceRef.current = null;
+    window.location.href = "/";
+  };
+
+  // ---------------------------------------------------------------------------
+  // Committee-data mutations (all go through patchCommittee)
+  // ---------------------------------------------------------------------------
 
   const addDelegate = (
     country: string,
@@ -286,10 +493,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       return {
         ...c,
         delegates: [...c.delegates, d],
-        judgeScores: [
-          ...c.judgeScores,
-          createEmptyRubricScore(d.id, c.type),
-        ],
+        judgeScores: [...c.judgeScores, createEmptyRubricScore(d.id, c.type)],
         daisScores: [...c.daisScores, createEmptyRubricScore(d.id, c.type)],
       };
     });
@@ -299,9 +503,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     const cid = requireCommittee();
     patchCommittee(cid, (c) => ({
       ...c,
-      delegates: c.delegates.map((d) =>
-        d.id === delegate.id ? delegate : d
-      ),
+      delegates: c.delegates.map((d) => (d.id === delegate.id ? delegate : d)),
     }));
   };
 
@@ -349,11 +551,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         const present = Object.values(attendance).filter(
           (s) => s === "present" || s === "present_voting"
         ).length;
-        return {
-          ...rc,
-          attendance,
-          quorumMet: present > c.delegates.length / 2,
-        };
+        return { ...rc, attendance, quorumMet: present > c.delegates.length / 2 };
       }),
     }));
   };
@@ -363,11 +561,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     patchCommittee(cid, (c) => ({
       ...c,
       motions: [
-        {
-          ...motion,
-          id: uuidv4(),
-          timestamp: new Date().toISOString(),
-        },
+        { ...motion, id: uuidv4(), timestamp: new Date().toISOString() },
         ...c.motions,
       ],
     }));
@@ -432,14 +626,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     const cid = requireCommittee();
     patchCommittee(cid, (c) => ({
       ...c,
-      documents: [
-        {
-          ...doc,
-          id: uuidv4(),
-          amendments: [],
-        },
-        ...c.documents,
-      ],
+      documents: [{ ...doc, id: uuidv4(), amendments: [] }, ...c.documents],
     }));
   };
 
@@ -456,27 +643,28 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     patchCommittee(cid, (c) => {
       const wp = c.documents.find((d) => d.id === workingPaperId);
       if (!wp || wp.type !== "working_paper") return c;
-      const updated = c.documents.map((d) =>
-        d.id === workingPaperId
-          ? { ...d, type: "draft_resolution" as const, status: "submitted" as const, submittedAt: new Date().toISOString() }
-          : d
-      );
-      return { ...c, documents: updated };
+      return {
+        ...c,
+        documents: c.documents.map((d) =>
+          d.id === workingPaperId
+            ? {
+                ...d,
+                type: "draft_resolution" as const,
+                status: "submitted" as const,
+                submittedAt: new Date().toISOString(),
+              }
+            : d
+        ),
+      };
     });
   };
 
-  const addSpeakingEvent = (
-    event: Omit<SpeakingEvent, "id" | "timestamp">
-  ) => {
+  const addSpeakingEvent = (event: Omit<SpeakingEvent, "id" | "timestamp">) => {
     const cid = requireCommittee();
     patchCommittee(cid, (c) => ({
       ...c,
       speakingEvents: [
-        {
-          ...event,
-          id: uuidv4(),
-          timestamp: new Date().toISOString(),
-        },
+        { ...event, id: uuidv4(), timestamp: new Date().toISOString() },
         ...c.speakingEvents,
       ],
     }));
@@ -502,9 +690,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     const cid = requireCommittee();
     patchCommittee(cid, (c) => ({
       ...c,
-      points: c.points.map((p) =>
-        p.id === id ? { ...p, resolved: true } : p
-      ),
+      points: c.points.map((p) => (p.id === id ? { ...p, resolved: true } : p)),
     }));
   };
 
@@ -521,13 +707,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       const total = computeRubricTotal(scores, c.type);
       const updated: RubricScore = existing
         ? { ...existing, scores, total, notes: notes ?? existing.notes }
-        : {
-            delegateId,
-            scores,
-            total,
-            notes: notes ?? "",
-            signed: false,
-          };
+        : { delegateId, scores, total, notes: notes ?? "", signed: false };
       const list = existing
         ? c[key].map((s) => (s.delegateId === delegateId ? updated : s))
         : [...c[key], updated];
@@ -577,15 +757,88 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     patchCommittee(cid, (c) => ({ ...c, vcRecipientId: delegateId }));
   };
 
-  const exportJson = () => {
-    if (conference) exportConferenceJson(conference);
+  // ---------------------------------------------------------------------------
+  // Export / Import
+  // ---------------------------------------------------------------------------
+
+  const exportJson = async () => {
+    if (!conference) return;
+    // Fetch all committee data to ensure export is complete
+    const rows = await Promise.all(
+      conference.committees.map((c) =>
+        fetch(`/api/committees/${c.id}`).then((r) => r.json())
+      )
+    );
+    const fullConference: Conference = {
+      ...conference,
+      committees: rows.map(rowToCommittee),
+    };
+    exportConferenceJson(fullConference);
   };
 
   const importJson = async (file: File) => {
     const data = await importConferenceJson(file);
-    setConference(data);
-    setActiveCommitteeId(data.committees[0]?.id ?? null);
+
+    // Update conference metadata
+    await fetch("/api/conference", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: data.name, year: data.year }),
+    });
+
+    // Remove existing committees
+    const current = conferenceRef.current;
+    if (current) {
+      await Promise.all(
+        current.committees.map((c) =>
+          fetch(`/api/committees/${c.id}`, { method: "DELETE" })
+        )
+      );
+    }
+
+    // Create committees from import
+    const newRows = await Promise.all(
+      data.committees.map(async (c) => {
+        const r = await fetch("/api/committees", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: c.name,
+            type: c.type,
+            topic: c.topic,
+            withDefaults: false,
+          }),
+        });
+        const row: DbCommitteeRow = await r.json();
+        // Patch with full data from the import
+        const patchR = await fetch(`/api/committees/${row.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            version: row.version,
+            data: committeeToData(c),
+          }),
+        });
+        const updated: DbCommitteeRow = await patchR.json();
+        versions.current.set(updated.id, updated.version);
+        return updated;
+      })
+    );
+
+    const newCommittees = newRows.map(rowToCommittee);
+    const newConference: Conference = {
+      ...data,
+      committees: newCommittees,
+    };
+    setConference(newConference);
+    conferenceRef.current = newConference;
+    const firstId = newCommittees[0]?.id ?? null;
+    setActiveCommitteeId(firstId);
   };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <ConferenceContext.Provider
@@ -593,11 +846,12 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         conference,
         activeCommittee,
         loading,
+        syncError,
+        clearSyncError: () => setSyncError(null),
         initConference,
         updateConference,
         removeCommittee,
         deleteConference,
-        verifyManagementPassword,
         createCommittee,
         selectCommittee,
         updateCommittee,

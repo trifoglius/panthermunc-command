@@ -2,24 +2,35 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { exportFullConferenceToExcel } from "@/lib/excel-export";
 import { Button, Card, Input, Select } from "@/components/ui";
 import type { CommitteeType } from "@/lib/types";
 
 export function Header() {
-  const { conference, exportJson, createCommittee } = useConference();
+  const { user, logout } = useAuth();
+  const { conference, exportJson, createCommittee, activeCommittee } =
+    useConference();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<CommitteeType>("ga");
   const [topic, setTopic] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const handleAddCommittee = () => {
+  const isAdmin = user?.role === "admin";
+
+  const handleAddCommittee = async () => {
     if (!name.trim()) return;
-    createCommittee(name.trim(), type, topic.trim(), type === "ga");
-    setName("");
-    setTopic("");
-    setShowAdd(false);
+    setCreating(true);
+    try {
+      await createCommittee(name.trim(), type, topic.trim(), type === "ga");
+    } finally {
+      setName("");
+      setTopic("");
+      setCreating(false);
+      setShowAdd(false);
+    }
   };
 
   return (
@@ -33,17 +44,19 @@ export function Header() {
               : "Conference Management"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {conference && (
             <>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowAdd(!showAdd)}
-                className="!border-white/30 !text-purple-900"
-              >
-                Add Committee
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowAdd(!showAdd)}
+                  className="!border-white/30 !text-purple-900"
+                >
+                  Add Committee
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
@@ -52,28 +65,74 @@ export function Header() {
               >
                 Backup JSON
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => exportFullConferenceToExcel(conference)}
-                className="!border-white/30 !text-purple-900"
-              >
-                Export All Excel
-              </Button>
-              <Link href="/settings">
+              {isAdmin ? (
                 <Button
                   variant="secondary"
                   size="sm"
+                  onClick={() => exportFullConferenceToExcel(conference)}
                   className="!border-white/30 !text-purple-900"
                 >
-                  Manage Conference
+                  Export All Excel
                 </Button>
-              </Link>
+              ) : activeCommittee ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    import("@/lib/excel-export").then(({ exportCommitteeToExcel }) =>
+                      exportCommitteeToExcel(activeCommittee)
+                    );
+                  }}
+                  className="!border-white/30 !text-purple-900"
+                >
+                  Export Excel
+                </Button>
+              ) : null}
+              {isAdmin && (
+                <Link href="/settings">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="!border-white/30 !text-purple-900"
+                  >
+                    Manage Conference
+                  </Button>
+                </Link>
+              )}
+              {isAdmin && (
+                <Link href="/admin/users">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="!border-white/30 !text-purple-900"
+                  >
+                    Users
+                  </Button>
+                </Link>
+              )}
             </>
+          )}
+          {user && (
+            <div className="flex items-center gap-2 border-l border-purple-600 pl-2">
+              <span className="text-xs text-purple-200">
+                {user.displayName}{" "}
+                <span className="rounded bg-purple-700 px-1 py-0.5 text-purple-100">
+                  {user.role}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="!text-purple-200 hover:!text-white"
+              >
+                Sign Out
+              </Button>
+            </div>
           )}
         </div>
       </div>
-      {showAdd && conference && (
+      {showAdd && isAdmin && conference && (
         <div className="border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
           <div className="mx-auto max-w-3xl">
             <Card title="New Committee">
@@ -99,7 +158,9 @@ export function Header() {
                   onChange={(e) => setTopic(e.target.value)}
                 />
                 <div className="flex items-end gap-2">
-                  <Button onClick={handleAddCommittee}>Create</Button>
+                  <Button onClick={handleAddCommittee} disabled={creating}>
+                    {creating ? "Creating..." : "Create"}
+                  </Button>
                   <Button variant="ghost" onClick={() => setShowAdd(false)}>
                     Cancel
                   </Button>
