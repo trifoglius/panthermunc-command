@@ -6,8 +6,10 @@ import { Button } from "@/components/ui";
 const TABS = [
   { id: "rollcall", label: "Roll Call" },
   { id: "motions", label: "Motions" },
+  { id: "motion_queues", label: "Motion Queues" },
   { id: "documents", label: "Documents" },
   { id: "delegates", label: "Delegates" },
+  { id: "points", label: "Points" },
   { id: "scoring", label: "Scoring" },
   { id: "stats", label: "Stats & Export" },
 ] as const;

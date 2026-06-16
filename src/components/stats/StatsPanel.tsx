@@ -4,19 +4,13 @@ import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { exportCommitteeToExcel } from "@/lib/excel-export";
 import { buildDelegateStats, getAwardPreview } from "@/lib/scoring";
-import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Input, Select } from "@/components/ui";
 
 export function StatsPanel() {
-  const { activeCommittee, addSpeakingEvent, addPoint, resolvePoint } =
-    useConference();
+  const { activeCommittee, addSpeakingEvent } = useConference();
   const [speakerId, setSpeakerId] = useState("");
   const [eventType, setEventType] = useState("gsl");
   const [duration, setDuration] = useState("");
-  const [pointType, setPointType] = useState<"order" | "privilege" | "inquiry">(
-    "inquiry"
-  );
-  const [pointDelegate, setPointDelegate] = useState("");
-  const [pointDesc, setPointDesc] = useState("");
 
   if (!activeCommittee) return null;
 
@@ -31,16 +25,6 @@ export function StatsPanel() {
       durationSeconds: duration ? Number(duration) : undefined,
     });
     setDuration("");
-  };
-
-  const logPoint = () => {
-    if (!pointDelegate || !pointDesc.trim()) return;
-    addPoint({
-      type: pointType,
-      delegateId: pointDelegate,
-      description: pointDesc.trim(),
-    });
-    setPointDesc("");
   };
 
   return (
@@ -117,121 +101,50 @@ export function StatsPanel() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Log Speaking Event">
-          <div className="grid gap-3">
-            <Select
-              label="Delegate"
-              value={speakerId}
-              onChange={(e) => setSpeakerId(e.target.value)}
-              options={[
-                { value: "", label: "Select..." },
-                ...activeCommittee.delegates.map((d) => ({
-                  value: d.id,
-                  label: d.country,
-                })),
-              ]}
-            />
-            <Select
-              label="Event Type"
-              value={eventType}
-              onChange={(e) => setEventType(e.target.value)}
-              options={[
-                { value: "gsl", label: "General Speakers List" },
-                { value: "moderated_caucus", label: "Moderated Caucus" },
-                { value: "round_robin", label: "Round Robin" },
-                { value: "presentation", label: "Presentation" },
-                { value: "qa", label: "Q&A" },
-                { value: "yield", label: "Yield (Rule 4)" },
-              ]}
-            />
-            <Input
-              label="Duration (seconds)"
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-            />
-            <Button onClick={logSpeech}>Log Speech</Button>
+      <Card title="Manual Speaking Event">
+        <p className="mb-3 text-sm text-purple-700">
+          Moderated caucuses and speakers lists log speeches automatically from
+          the Motions tab. Use this for other speaking events.
+        </p>
+        <div className="grid gap-3 md:grid-cols-4">
+          <Select
+            label="Delegate"
+            value={speakerId}
+            onChange={(e) => setSpeakerId(e.target.value)}
+            options={[
+              { value: "", label: "Select..." },
+              ...activeCommittee.delegates.map((d) => ({
+                value: d.id,
+                label: d.country,
+              })),
+            ]}
+          />
+          <Select
+            label="Event Type"
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value)}
+            options={[
+              { value: "gsl", label: "General Speakers List" },
+              { value: "moderated_caucus", label: "Moderated Caucus" },
+              { value: "round_robin", label: "Round Robin" },
+              { value: "presentation", label: "Presentation" },
+              { value: "qa", label: "Q&A" },
+              { value: "yield", label: "Yield (Rule 4)" },
+            ]}
+          />
+          <Input
+            label="Duration (seconds)"
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+          />
+          <div className="flex items-end">
+            <Button onClick={logSpeech} disabled={!speakerId}>
+              Log Speech
+            </Button>
           </div>
-        </Card>
-
-        <Card title="Points (Rules 24–26)">
-          <div className="grid gap-3">
-            <Select
-              label="Point Type"
-              value={pointType}
-              onChange={(e) =>
-                setPointType(
-                  e.target.value as "order" | "privilege" | "inquiry"
-                )
-              }
-              options={[
-                { value: "order", label: "Point of Order (Rule 24)" },
-                {
-                  value: "privilege",
-                  label: "Point of Personal Privilege (Rule 25)",
-                },
-                { value: "inquiry", label: "Point of Inquiry (Rule 26)" },
-              ]}
-            />
-            <Select
-              label="Delegate"
-              value={pointDelegate}
-              onChange={(e) => setPointDelegate(e.target.value)}
-              options={[
-                { value: "", label: "Select..." },
-                ...activeCommittee.delegates.map((d) => ({
-                  value: d.id,
-                  label: d.country,
-                })),
-              ]}
-            />
-            <Textarea
-              label="Description"
-              value={pointDesc}
-              onChange={(e) => setPointDesc(e.target.value)}
-              rows={2}
-            />
-            <Button onClick={logPoint}>Log Point</Button>
-          </div>
-
-          {activeCommittee.points.length > 0 && (
-            <ul className="mt-4 space-y-2 text-sm">
-              {activeCommittee.points.map((p) => {
-                const d = activeCommittee.delegates.find(
-                  (x) => x.id === p.delegateId
-                );
-                return (
-                  <li
-                    key={p.id}
-                    className={`rounded border p-2 ${
-                      p.resolved
-                        ? "border-gray-200 bg-gray-50 opacity-60"
-                        : "border-purple-100"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>
-                        <Badge color="purple">{p.type}</Badge>{" "}
-                        {d?.country}: {p.description}
-                      </span>
-                      {!p.resolved && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => resolvePoint(p.id)}
-                        >
-                          Resolve
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       <Card title="Delegate Statistics">
         <div className="overflow-x-auto">

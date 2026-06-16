@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { exportFullConferenceToExcel } from "@/lib/excel-export";
@@ -59,12 +60,21 @@ export function Header() {
               >
                 Export All Excel
               </Button>
+              <Link href="/settings">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="!border-white/30 !text-purple-900"
+                >
+                  Manage Conference
+                </Button>
+              </Link>
             </>
           )}
         </div>
       </div>
       {showAdd && conference && (
-        <div className="border-t border-purple-700 bg-purple-900 px-4 py-4">
+        <div className="border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
           <div className="mx-auto max-w-3xl">
             <Card title="New Committee">
               <div className="grid gap-3 md:grid-cols-4">

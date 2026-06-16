@@ -53,6 +53,7 @@ export function exportCommitteeToExcel(committee: Committee) {
     Title: doc.title,
     Type: doc.type,
     Status: doc.status,
+    Link: doc.link ?? "",
     Sponsors: doc.sponsors
       .map((id) => committee.delegates.find((d) => d.id === id)?.country ?? id)
       .join(", "),

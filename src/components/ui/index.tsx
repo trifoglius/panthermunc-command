@@ -94,7 +94,7 @@ export function Input({
         </span>
       )}
       <input
-        className={`w-full rounded-md border border-purple-200 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
+        className={`w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
         {...props}
       />
     </label>
@@ -118,7 +118,7 @@ export function Select({
         </span>
       )}
       <select
-        className={`w-full rounded-md border border-purple-200 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
+        className={`w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
         {...props}
       >
         {options.map((o) => (
@@ -144,7 +144,7 @@ export function Textarea({
         </span>
       )}
       <textarea
-        className={`w-full rounded-md border border-purple-200 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
+        className={`w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
         {...props}
       />
     </label>

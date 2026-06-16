@@ -9,6 +9,8 @@ import {
 } from "@/components/layout/CommitteeNav";
 import { Header } from "@/components/layout/Header";
 import { MotionPanel } from "@/components/motions/MotionPanel";
+import { MotionQueuesPanel } from "@/components/motions/MotionQueuesPanel";
+import { PointsPanel } from "@/components/points/PointsPanel";
 import { RollCallPanel } from "@/components/rollcall/RollCallPanel";
 import { ScoringPanel } from "@/components/scoring/ScoringPanel";
 import { StatsPanel } from "@/components/stats/StatsPanel";
@@ -20,14 +22,24 @@ function SetupScreen() {
   const { initConference, createCommittee, importJson } = useConference();
   const [confName, setConfName] = useState("PantherMUNC");
   const [year, setYear] = useState(new Date().getFullYear());
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [creating, setCreating] = useState(false);
   const [step, setStep] = useState<"conference" | "committee">("conference");
   const [committeeName, setCommitteeName] = useState("");
   const [committeeType, setCommitteeType] = useState<CommitteeType>("ga");
   const [topic, setTopic] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleCreateConference = () => {
-    initConference(confName, year);
+  const handleCreateConference = async () => {
+    if (!password.trim()) {
+      setPasswordError("A management password is required.");
+      return;
+    }
+    setPasswordError("");
+    setCreating(true);
+    await initConference(confName, year, password);
+    setCreating(false);
     setStep("committee");
   };
 
@@ -80,8 +92,18 @@ function SetupScreen() {
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
             />
-            <Button onClick={handleCreateConference}>
-              Continue to Committee Setup
+            <Input
+              label="Management Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Required to access conference settings"
+            />
+            {passwordError && (
+              <p className="text-sm text-red-600">{passwordError}</p>
+            )}
+            <Button onClick={handleCreateConference} disabled={creating}>
+              {creating ? "Creating..." : "Continue to Committee Setup"}
             </Button>
           </div>
         </Card>
@@ -135,8 +157,10 @@ function CommitteeWorkspace() {
   const panels: Record<TabId, React.ReactNode> = {
     rollcall: <RollCallPanel />,
     motions: <MotionPanel />,
+    motion_queues: <MotionQueuesPanel />,
     documents: <DocumentPanel />,
     delegates: <DelegateManager />,
+    points: <PointsPanel />,
     scoring: <ScoringPanel />,
     stats: <StatsPanel />,
   };

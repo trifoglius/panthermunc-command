@@ -2,24 +2,36 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
+import { MotionActiveSession } from "@/components/motions/MotionActiveSession";
 import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
+import { getTimerConfig, motionHasTimer } from "@/lib/motion-timers";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
 
 export function MotionPanel() {
-  const { activeCommittee, addMotion, updateMotion } = useConference();
+  const {
+    activeCommittee,
+    addMotion,
+    updateMotion,
+    archiveMotionQueue,
+  } = useConference();
   const [motionType, setMotionType] = useState<string>(MOTION_TYPES[0].id);
   const [proposedBy, setProposedBy] = useState("");
   const [details, setDetails] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
+  const [activeMotionId, setActiveMotionId] = useState<string | null>(null);
 
   if (!activeCommittee) return null;
 
   const selectedMotion = MOTION_TYPES.find((m) => m.id === motionType)!;
+  const activeMotion = activeCommittee.motions.find(
+    (m) => m.id === activeMotionId
+  );
 
   const handleSubmit = () => {
     if (!proposedBy) return;
     addMotion({
+      motionTypeId: selectedMotion.id,
       type: selectedMotion.label,
       proposedBy,
       status: "pending",
@@ -31,15 +43,42 @@ export function MotionPanel() {
     setNotes("");
   };
 
+  const handleStatusChange = (motion: Motion, status: MotionStatus) => {
+    const updated = { ...motion, status };
+    updateMotion(updated);
+    if (status === "passed" && getTimerConfig(updated)) {
+      setActiveMotionId(motion.id);
+    }
+  };
+
   const sortedMotions = [...activeCommittee.motions].sort(
     (a, b) => b.disruptivity - a.disruptivity
   );
 
+  const passedMotions = sortedMotions.filter((m) => m.status === "passed");
+  const archiveTarget =
+    (activeMotionId && passedMotions.find((m) => m.id === activeMotionId)) ??
+    passedMotions[0];
+
+  const handleArchive = () => {
+    if (!archiveTarget) return;
+    archiveMotionQueue(archiveTarget.id);
+    setActiveMotionId(null);
+  };
+
   return (
     <div className="space-y-4">
+      {activeMotion && activeMotion.status === "passed" && (
+        <MotionActiveSession
+          motion={activeMotion}
+          onDismiss={() => setActiveMotionId(null)}
+        />
+      )}
+
       <Card title="Propose Motion">
         <p className="mb-3 text-sm text-purple-700">
-          Motions are voted on from most to least disruptive (Rule 3).
+          Motions are voted on from most to least disruptive (Rule 3). When a
+          timed motion passes, a timer and speaker list will appear automatically.
         </p>
         <div className="grid gap-3 md:grid-cols-2">
           <Select
@@ -138,6 +177,19 @@ export function MotionPanel() {
       </Card>
 
       <Card title="Motion Queue (by Disruptivity)">
+        {passedMotions.length > 0 && sortedMotions.length > 0 && (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3">
+            <p className="text-sm text-green-900">
+              A motion has passed
+              {archiveTarget ? `: ${archiveTarget.type}` : ""}. When finished,
+              archive this queue to save it to Motion Queues and start fresh.
+            </p>
+            <Button className="mt-2" onClick={handleArchive}>
+              Archive Queue &amp; Clear
+            </Button>
+          </div>
+        )}
+
         {sortedMotions.length === 0 ? (
           <p className="text-sm text-purple-600">No motions logged yet.</p>
         ) : (
@@ -147,7 +199,10 @@ export function MotionPanel() {
                 key={motion.id}
                 motion={motion}
                 committee={activeCommittee}
+                isActive={activeMotionId === motion.id}
+                onStatusChange={handleStatusChange}
                 onUpdate={updateMotion}
+                onOpenSession={() => setActiveMotionId(motion.id)}
               />
             ))}
           </div>
@@ -160,13 +215,20 @@ export function MotionPanel() {
 function MotionRow({
   motion,
   committee,
+  isActive,
+  onStatusChange,
   onUpdate,
+  onOpenSession,
 }: {
   motion: Motion;
   committee: NonNullable<ReturnType<typeof useConference>["activeCommittee"]>;
+  isActive: boolean;
+  onStatusChange: (motion: Motion, status: MotionStatus) => void;
   onUpdate: (m: Motion) => void;
+  onOpenSession: () => void;
 }) {
   const proposer = committee.delegates.find((d) => d.id === motion.proposedBy);
+  const hasTimer = motionHasTimer(motion);
   const statusColors: Record<MotionStatus, "yellow" | "green" | "red" | "gray"> =
     {
       pending: "yellow",
@@ -176,7 +238,11 @@ function MotionRow({
     };
 
   return (
-    <div className="rounded-md border border-purple-100 p-3">
+    <div
+      className={`rounded-md border p-3 ${
+        isActive ? "border-purple-400 bg-purple-50" : "border-purple-100"
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-purple-900">{motion.type}</p>
@@ -196,7 +262,14 @@ function MotionRow({
             <p className="text-sm italic text-purple-600">{motion.notes}</p>
           )}
         </div>
-        <Badge color={statusColors[motion.status]}>{motion.status}</Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge color={statusColors[motion.status]}>{motion.status}</Badge>
+          {hasTimer && motion.status === "passed" && (
+            <Button size="sm" variant="secondary" onClick={onOpenSession}>
+              Open Timer
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -206,7 +279,7 @@ function MotionRow({
               key={s}
               size="sm"
               variant={motion.status === s ? "primary" : "secondary"}
-              onClick={() => onUpdate({ ...motion, status: s })}
+              onClick={() => onStatusChange(motion, s)}
             >
               {s}
             </Button>

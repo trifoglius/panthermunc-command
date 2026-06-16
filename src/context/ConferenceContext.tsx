@@ -17,7 +17,9 @@ import {
   importConferenceJson,
   loadConference,
   saveConference,
+  clearConference as clearStoredConference,
 } from "@/lib/storage";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import type {
   Committee,
   CommitteeType,
@@ -25,6 +27,7 @@ import type {
   Delegate,
   Document,
   Motion,
+  MotionQueueSnapshot,
   Point,
   PositionPaperStatus,
   RollCallSession,
@@ -33,12 +36,17 @@ import type {
   ScorerRole,
   SpeakingEvent,
 } from "@/lib/types";
+import { isFormalSpeakingMotion } from "@/lib/motion-timers";
 
 interface ConferenceContextValue {
   conference: Conference | null;
   activeCommittee: Committee | null;
   loading: boolean;
-  initConference: (name: string, year: number) => void;
+  initConference: (name: string, year: number, password: string) => Promise<void>;
+  updateConference: (updates: { name?: string; year?: number }) => void;
+  removeCommittee: (id: string) => void;
+  deleteConference: () => void;
+  verifyManagementPassword: (password: string) => Promise<boolean>;
   createCommittee: (
     name: string,
     type: CommitteeType,
@@ -62,6 +70,8 @@ interface ConferenceContextValue {
   ) => void;
   addMotion: (motion: Omit<Motion, "id" | "timestamp">) => void;
   updateMotion: (motion: Motion) => void;
+  setMotionSpeakerQueue: (motionId: string, queue: string[]) => void;
+  archiveMotionQueue: (passedMotionId: string) => void;
   addDocument: (doc: Omit<Document, "id" | "amendments">) => void;
   updateDocument: (doc: Document) => void;
   promoteToDraftResolution: (workingPaperId: string) => void;
@@ -89,12 +99,17 @@ interface ConferenceContextValue {
 
 const ConferenceContext = createContext<ConferenceContextValue | null>(null);
 
-function createDefaultConference(name: string, year: number): Conference {
+function createDefaultConference(
+  name: string,
+  year: number,
+  managementPasswordHash?: string
+): Conference {
   const now = new Date().toISOString();
   return {
     id: uuidv4(),
     name,
     year,
+    managementPasswordHash,
     committees: [],
     createdAt: now,
     updatedAt: now,
@@ -127,6 +142,8 @@ function createDefaultCommittee(
     delegates,
     rollCalls: [],
     motions: [],
+    motionQueueHistory: [],
+    motionSessionState: {},
     documents: [],
     speakingEvents: [],
     points: [],
@@ -187,10 +204,49 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     return activeCommitteeId;
   };
 
-  const initConference = (name: string, year: number) => {
-    const conf = createDefaultConference(name, year);
+  const initConference = async (name: string, year: number, password: string) => {
+    const managementPasswordHash = await hashPassword(password);
+    const conf = createDefaultConference(name, year, managementPasswordHash);
     setConference(conf);
     setActiveCommitteeId(null);
+  };
+
+  const updateConference = (updates: { name?: string; year?: number }) => {
+    setConference((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  };
+
+  const removeCommittee = (id: string) => {
+    const remaining =
+      conference?.committees.filter((c) => c.id !== id) ?? [];
+    if (activeCommitteeId === id) {
+      setActiveCommitteeId(remaining[0]?.id ?? null);
+    }
+    setConference((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        committees: prev.committees.filter((c) => c.id !== id),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  };
+
+  const deleteConference = () => {
+    clearStoredConference();
+    setConference(null);
+    setActiveCommitteeId(null);
+  };
+
+  const verifyManagementPassword = async (password: string) => {
+    if (!conference?.managementPasswordHash) return true;
+    return verifyPassword(password, conference.managementPasswordHash);
   };
 
   const createCommittee = (
@@ -323,6 +379,53 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       ...c,
       motions: c.motions.map((m) => (m.id === motion.id ? motion : m)),
     }));
+  };
+
+  const setMotionSpeakerQueue = (motionId: string, queue: string[]) => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => ({
+      ...c,
+      motionSessionState: {
+        ...(c.motionSessionState ?? {}),
+        [motionId]: { speakerQueue: queue },
+      },
+    }));
+  };
+
+  const archiveMotionQueue = (passedMotionId: string) => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => {
+      const passedMotion =
+        c.motions.find((m) => m.id === passedMotionId) ?? null;
+      const sessionState = c.motionSessionState ?? {};
+      const speakerQueue =
+        passedMotion && isFormalSpeakingMotion(passedMotion)
+          ? sessionState[passedMotionId]?.speakerQueue
+          : undefined;
+
+      const snapshot: MotionQueueSnapshot = {
+        id: uuidv4(),
+        label: passedMotion
+          ? `After: ${passedMotion.type}`
+          : `Queue ${(c.motionQueueHistory?.length ?? 0) + 1}`,
+        savedAt: new Date().toISOString(),
+        passedMotion,
+        motions: [...c.motions],
+        speakerQueue:
+          speakerQueue && speakerQueue.length > 0 ? speakerQueue : undefined,
+      };
+
+      const archivedIds = new Set(c.motions.map((m) => m.id));
+      const nextSessionState = { ...sessionState };
+      archivedIds.forEach((id) => delete nextSessionState[id]);
+
+      return {
+        ...c,
+        motions: [],
+        motionQueueHistory: [snapshot, ...(c.motionQueueHistory ?? [])],
+        motionSessionState: nextSessionState,
+      };
+    });
   };
 
   const addDocument = (doc: Omit<Document, "id" | "amendments">) => {
@@ -491,6 +594,10 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         activeCommittee,
         loading,
         initConference,
+        updateConference,
+        removeCommittee,
+        deleteConference,
+        verifyManagementPassword,
         createCommittee,
         selectCommittee,
         updateCommittee,
@@ -501,6 +608,8 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         updateRollCallStatus,
         addMotion,
         updateMotion,
+        setMotionSpeakerQueue,
+        archiveMotionQueue,
         addDocument,
         updateDocument,
         promoteToDraftResolution,

@@ -29,6 +29,7 @@ export interface RollCallSession {
 
 export interface Motion {
   id: string;
+  motionTypeId?: string;
   type: string;
   proposedBy: string;
   timestamp: string;
@@ -59,6 +60,7 @@ export interface Document {
   signatories: string[];
   authorPanel: string[];
   content: string;
+  link?: string;
   amendments: Amendment[];
   submittedAt?: string;
   sourceWorkingPaperId?: string;
@@ -97,6 +99,15 @@ export interface PositionPaperScore {
   notes: string;
 }
 
+export interface MotionQueueSnapshot {
+  id: string;
+  label: string;
+  savedAt: string;
+  passedMotion: Motion | null;
+  motions: Motion[];
+  speakerQueue?: string[];
+}
+
 export interface Committee {
   id: string;
   name: string;
@@ -105,6 +116,8 @@ export interface Committee {
   delegates: Delegate[];
   rollCalls: RollCallSession[];
   motions: Motion[];
+  motionQueueHistory?: MotionQueueSnapshot[];
+  motionSessionState?: Record<string, { speakerQueue: string[] }>;
   documents: Document[];
   speakingEvents: SpeakingEvent[];
   points: Point[];
@@ -121,6 +134,7 @@ export interface Conference {
   id: string;
   name: string;
   year: number;
+  managementPasswordHash?: string;
   committees: Committee[];
   createdAt: string;
   updatedAt: string;

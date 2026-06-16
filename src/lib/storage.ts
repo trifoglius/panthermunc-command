@@ -31,6 +31,11 @@ export function exportConferenceJson(conference: Conference): void {
   URL.revokeObjectURL(url);
 }
 
+export function clearConference(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
+}
+
 export function importConferenceJson(file: File): Promise<Conference> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

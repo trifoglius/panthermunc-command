@@ -12,11 +12,14 @@ export const PANTHER_PURPLE = {
 };
 
 export const GA_RUBRIC = [
-  { key: "research", label: "Research & Country Knowledge", max: 10 },
-  { key: "diplomacy", label: "Diplomacy & Collaboration", max: 10 },
-  { key: "speaking", label: "Public Speaking", max: 10 },
-  { key: "writing", label: "Resolution Writing", max: 10 },
-  { key: "procedure", label: "Procedural Knowledge", max: 10 },
+  { key: "research", label: "Preparation and Research", max: 5 },
+  { key: "policy", label: "Policy Alignment", max: 5 },
+  { key: "leading", label: "Bloc Leading and Debate", max: 5 },
+  { key: "impact", label: "Impact and Efficacy", max: 5 },
+  { key: "debate", label: "Debate Engagement and Skill", max: 5 },
+  { key: "diplomacy", label: "Diplomacy and Etiquette", max: 5 },
+  { key: "rules", label: "Rules and Procedure", max: 5 },
+  { key: "formatting", label: "Formatting", max: 5 },
 ];
 
 export const CRISIS_RUBRIC = [

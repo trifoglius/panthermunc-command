@@ -15,6 +15,7 @@ export function DocumentPanel() {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<DocumentType>("working_paper");
   const [content, setContent] = useState("");
+  const [link, setLink] = useState("");
   const [sponsors, setSponsors] = useState<string[]>([]);
   const [signatories, setSignatories] = useState<string[]>([]);
   const [authorPanel, setAuthorPanel] = useState<string[]>([]);
@@ -34,9 +35,11 @@ export function DocumentPanel() {
       signatories,
       authorPanel,
       content,
+      link: link.trim() || undefined,
     });
     setTitle("");
     setContent("");
+    setLink("");
     setSponsors([]);
     setSignatories([]);
     setAuthorPanel([]);
@@ -64,6 +67,15 @@ export function DocumentPanel() {
               { value: "working_paper", label: "Working Paper" },
               { value: "draft_resolution", label: "Draft Resolution" },
             ]}
+          />
+        </div>
+        <div className="mt-3">
+          <Input
+            label="Document Link"
+            type="url"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://docs.google.com/..."
           />
         </div>
         <div className="mt-3">
@@ -198,7 +210,32 @@ function DocumentRow({
           <p className="text-sm text-purple-700">
             Author Panel: {country(doc.authorPanel) || "None"}
           </p>
+          {doc.link && (
+            <p className="text-sm">
+              <a
+                href={doc.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-700 underline hover:text-purple-900"
+              >
+                Open Document
+              </a>
+            </p>
+          )}
         </div>
+      </div>
+
+      <div className="mt-2">
+        <Input
+          label="Document Link"
+          type="url"
+          value={doc.link ?? ""}
+          onChange={(e) =>
+            onUpdate({ ...doc, link: e.target.value.trim() || undefined })
+          }
+          placeholder="https://..."
+          className="mb-2"
+        />
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2">
