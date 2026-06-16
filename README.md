@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PantherMUNC Command
+
+Conference management tool for [PantherMUNC](https://panthermunc.org), modeled after MUNCommand-style dais software. Built for roll call, motion tracking, document management, dual scoring (judge + dais), and Excel export.
+
+## Features
+
+- **Roll Call** — Present / Present & Voting with quorum detection (Rules 1–2)
+- **Motions** — All PantherMUNC motion types with disruptivity ordering (Rule 3)
+- **Documents** — Working papers, draft resolutions, sponsors, signatories, author panels (Rules 12–15)
+- **Delegate Management** — Add countries, track position paper status (EPP/LPP)
+- **Scoring** — Separate judge and dais rubrics (GA & Crisis), composite scores, discrepancy/tie detection per Awards Policies AP.1
+- **Stats & Export** — Speaking events, points, awards preview, Excel export per committee or full conference
+- **Backup/Restore** — JSON backup for data persistence between sessions
+
+## Design
+
+- **Colors:** Purple and white (PantherMUNC branding)
+- **Font:** Arial throughout
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+cd panthermunc-command
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deployment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Deploy to any Node.js host (Vercel, Netlify, etc.) or serve statically after `npm run build`:
 
-## Learn More
+```bash
+npm run build
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+For **panthermunc.org**, you can host this as a subdomain (e.g. `command.panthermunc.org`) alongside your Google Sites page.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data Storage
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+All data is stored in the browser's `localStorage`. Use **Backup JSON** regularly and **Export All Excel** for the Secretary of Analytics spreadsheet workflow (AP.1.7).
 
-## Deploy on Vercel
+## Excel Export
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Each committee export includes sheets for:
+- Delegate Stats
+- Motions
+- Documents
+- Roll Call
+- Awards Preview
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Full conference export includes all committees.
+
+## Rules Reference
+
+Built-in support aligns with PantherMUNC Rules of Procedure and Awards Policies provided in the parent directory.
