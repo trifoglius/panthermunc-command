@@ -68,7 +68,12 @@ function AdminSetupScreen() {
             label="Year"
             type="number"
             value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
+            onChange={(e) => {
+              const nextYear = Number.parseInt(e.target.value, 10);
+              if (Number.isFinite(nextYear) && nextYear > 0) {
+                setYear(nextYear);
+              }
+            }}
           />
         </div>
       </Card>

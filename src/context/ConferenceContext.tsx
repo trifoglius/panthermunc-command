@@ -240,7 +240,6 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      setLoading(false);
       return;
     }
 
@@ -918,7 +917,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       value={{
         conference,
         activeCommittee,
-        loading,
+        loading: user ? loading : false,
         syncError,
         clearSyncError: () => setSyncError(null),
         initConference,

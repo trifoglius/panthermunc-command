@@ -20,25 +20,14 @@ export default function SettingsPage() {
     deleteConference,
   } = useConference();
 
-  const [name, setName] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [draftName, setDraftName] = useState<string | null>(null);
+  const [draftYear, setDraftYear] = useState<number | null>(null);
   const [committeeNames, setCommitteeNames] = useState<Record<string, string>>(
     {}
   );
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [showDelete, setShowDelete] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!conference) return;
-    setName(conference.name);
-    setYear(conference.year);
-    const names: Record<string, string> = {};
-    conference.committees.forEach((c) => {
-      names[c.id] = c.name;
-    });
-    setCommitteeNames(names);
-  }, [conference]);
 
   // Redirect non-admins
   useEffect(() => {
@@ -57,10 +46,14 @@ export default function SettingsPage() {
   }
 
   if (!conference || user?.role !== "admin") return null;
+  const name = draftName ?? conference.name;
+  const year = draftYear ?? conference.year;
 
   const handleSaveDetails = async () => {
     setSaving(true);
     await updateConference({ name: name.trim() || conference.name, year });
+    setDraftName(null);
+    setDraftYear(null);
     setSaving(false);
   };
 
@@ -112,13 +105,18 @@ export default function SettingsPage() {
             <Input
               label="Conference Name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setDraftName(e.target.value)}
             />
             <Input
               label="Year"
               type="number"
               value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
+              onChange={(e) => {
+                const nextYear = Number.parseInt(e.target.value, 10);
+                if (Number.isFinite(nextYear) && nextYear > 0) {
+                  setDraftYear(nextYear);
+                }
+              }}
             />
             <Button onClick={handleSaveDetails} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}

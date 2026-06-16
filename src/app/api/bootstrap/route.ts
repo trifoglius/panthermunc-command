@@ -14,7 +14,17 @@ import { db, conferences, users } from "@/db";
  * Call once after first deploy:
  *   curl -X POST https://your-domain/api/bootstrap
  */
-export async function POST() {
+export async function POST(request: Request) {
+  const bootstrapToken = process.env.BOOTSTRAP_TOKEN;
+  if (bootstrapToken) {
+    const providedToken = request.headers.get("x-bootstrap-token");
+    // Optional hardening: require a shared secret to call bootstrap.
+    // This avoids unauthenticated first-hit takeover in exposed environments.
+    if (providedToken !== bootstrapToken) {
+      return Response.json({ error: "Invalid bootstrap token" }, { status: 403 });
+    }
+  }
+
   const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
 

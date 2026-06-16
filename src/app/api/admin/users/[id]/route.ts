@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
-import { db, users } from "@/db";
+import { db, committees, users } from "@/db";
 import { authErrorResponse, requireAdmin } from "@/lib/session";
 
 // PATCH /api/admin/users/[id]
@@ -12,7 +12,20 @@ export async function PATCH(
   try {
     const { id } = await params;
     const session = await requireAdmin();
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (!body || typeof body !== "object") {
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const payload = body as {
+      displayName?: unknown;
+      committeeId?: unknown;
+      password?: unknown;
+    };
 
     const updates: {
       displayName?: string;
@@ -20,14 +33,36 @@ export async function PATCH(
       passwordHash?: string;
     } = {};
 
-    if (typeof body.displayName === "string") {
-      updates.displayName = body.displayName.trim();
+    if (typeof payload.displayName === "string") {
+      updates.displayName = payload.displayName.trim();
     }
-    if ("committeeId" in body) {
-      updates.committeeId = body.committeeId ?? null;
+    if ("committeeId" in payload) {
+      if (
+        payload.committeeId !== null &&
+        payload.committeeId !== undefined &&
+        typeof payload.committeeId !== "string"
+      ) {
+        return Response.json({ error: "Invalid committeeId" }, { status: 400 });
+      }
+      if (typeof payload.committeeId === "string") {
+        const [committee] = await db
+          .select({ id: committees.id })
+          .from(committees)
+          .where(
+            and(
+              eq(committees.id, payload.committeeId),
+              eq(committees.conferenceId, session.conferenceId)
+            )
+          )
+          .limit(1);
+        if (!committee) {
+          return Response.json({ error: "Committee not found" }, { status: 400 });
+        }
+      }
+      updates.committeeId = payload.committeeId ?? null;
     }
-    if (typeof body.password === "string" && body.password) {
-      updates.passwordHash = await hash(body.password, 12);
+    if (typeof payload.password === "string" && payload.password) {
+      updates.passwordHash = await hash(payload.password, 12);
     }
 
     if (Object.keys(updates).length === 0) {

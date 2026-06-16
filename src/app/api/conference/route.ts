@@ -51,16 +51,33 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const session = await requireAdmin();
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (!body || typeof body !== "object") {
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const payload = body as { name?: unknown; year?: unknown };
 
     const updates: { name?: string; year?: number; updatedAt: Date } = {
       updatedAt: new Date(),
     };
-    if (typeof body.name === "string" && body.name.trim()) {
-      updates.name = body.name.trim();
+    if (typeof payload.name === "string" && payload.name.trim()) {
+      updates.name = payload.name.trim();
     }
-    if (typeof body.year === "number") {
-      updates.year = body.year;
+    if (payload.year !== undefined) {
+      if (
+        typeof payload.year !== "number" ||
+        !Number.isInteger(payload.year) ||
+        payload.year < 1900 ||
+        payload.year > 3000
+      ) {
+        return Response.json({ error: "Invalid conference year" }, { status: 400 });
+      }
+      updates.year = payload.year;
     }
 
     const [updated] = await db

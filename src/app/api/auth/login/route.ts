@@ -5,9 +5,26 @@ import { authErrorResponse, getSession } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (!body || typeof body !== "object") {
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const { username, password } = body as {
+      username?: unknown;
+      password?: unknown;
+    };
 
-    if (!username || !password) {
+    if (
+      typeof username !== "string" ||
+      !username.trim() ||
+      typeof password !== "string" ||
+      !password
+    ) {
       return Response.json(
         { error: "Username and password are required" },
         { status: 400 }

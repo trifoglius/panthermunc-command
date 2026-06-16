@@ -25,6 +25,16 @@ export function MotionActiveSession({
   const config = getTimerConfig(motion);
   if (!config) return null;
 
+  return (
+    <MotionActiveSessionBody motion={motion} onDismiss={onDismiss} config={config} />
+  );
+}
+
+function MotionActiveSessionBody({
+  motion,
+  onDismiss,
+  config,
+}: MotionActiveSessionProps & { config: MotionTimerConfig }) {
   const timers = useSessionTimers(
     config.totalSeconds ?? 0,
     config.speakingSeconds ?? 0
@@ -102,7 +112,6 @@ function TimerDisplay({
         <TimerCard
           label="Total Time"
           seconds={timers.totalSeconds}
-          initialSeconds={timers.totalInitial}
           running={timers.mode === "total" || timers.mode === "speaking"}
           onStart={timers.startTotal}
           onPause={timers.pause}
@@ -115,7 +124,6 @@ function TimerDisplay({
         <TimerCard
           label="Speaking Time"
           seconds={timers.speakingSeconds}
-          initialSeconds={timers.speakingInitial}
           running={timers.mode === "speaking"}
           onStart={timers.startSpeaking}
           onPause={timers.pause}
@@ -138,7 +146,6 @@ function TimerDisplay({
 function TimerCard({
   label,
   seconds,
-  initialSeconds,
   running,
   onStart,
   onPause,
@@ -149,7 +156,6 @@ function TimerCard({
 }: {
   label: string;
   seconds: number;
-  initialSeconds: number;
   running: boolean;
   onStart: () => void;
   onPause: () => void;
@@ -214,7 +220,6 @@ function PhaseTimer({
     <TimerCard
       label={label}
       seconds={seconds}
-      initialSeconds={initialSeconds}
       running={running}
       onStart={start}
       onPause={pause}

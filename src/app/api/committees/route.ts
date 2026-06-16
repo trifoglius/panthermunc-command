@@ -12,29 +12,44 @@ import type { CommitteeType, Delegate } from "@/lib/types";
 export async function POST(request: Request) {
   try {
     const session = await requireAdmin();
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (!body || typeof body !== "object") {
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const payload = body as {
+      name?: unknown;
+      type?: unknown;
+      withDefaults?: unknown;
+      delegates?: unknown;
+      topic?: unknown;
+    };
 
-    if (!body.name?.trim()) {
+    if (typeof payload.name !== "string" || !payload.name.trim()) {
       return Response.json({ error: "Committee name is required" }, { status: 400 });
     }
 
     const validTypes: CommitteeType[] = ["ga", "crisis", "specialized"];
-    if (!validTypes.includes(body.type)) {
+    if (typeof payload.type !== "string" || !validTypes.includes(payload.type as CommitteeType)) {
       return Response.json({ error: "Invalid committee type" }, { status: 400 });
     }
 
     // Pre-populate delegates for GA committees when requested
     const delegates: Delegate[] =
-      body.withDefaults && body.type === "ga"
+      payload.withDefaults && payload.type === "ga"
         ? DEFAULT_DELEGATES_GA.map((country: string) => ({
             id: uuidv4(),
             country,
             delegateName: "",
             positionPaperStatus: "none" as const,
           }))
-        : (body.delegates ?? []);
+        : [];
 
-    const type = body.type as CommitteeType;
+    const type = payload.type as CommitteeType;
     const judgeScores = delegates.map((d) => createEmptyRubricScore(d.id, type));
     const daisScores = delegates.map((d) => createEmptyRubricScore(d.id, type));
 
@@ -51,16 +66,16 @@ export async function POST(request: Request) {
       daisScores,
       positionPaperScores: [],
       discrepancyThreshold: 10,
-      requirePositionPapers: body.type === "ga",
+      requirePositionPapers: payload.type === "ga",
     };
 
     const [committee] = await db
       .insert(committees)
       .values({
         conferenceId: session.conferenceId,
-        name: body.name.trim(),
-        type: body.type,
-        topic: body.topic?.trim() ?? "",
+        name: payload.name.trim(),
+        type: payload.type,
+        topic: typeof payload.topic === "string" ? payload.topic.trim() : "",
         data: emptyData,
         version: 0,
       })
