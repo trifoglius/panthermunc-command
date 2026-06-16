@@ -10,7 +10,7 @@ import { Button, Card, Input, Select } from "@/components/ui";
 import type { CommitteeType } from "@/lib/types";
 
 export function Header() {
-  const { user, logout } = useAuth();
+  const { user, logout, authLoading } = useAuth();
   const { conference, createCommittee, activeCommittee } = useConference();
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
@@ -106,14 +106,18 @@ export function Header() {
               )}
             </>
           )}
-          {user && (
-            <div className="flex items-center gap-2 border-l border-purple-600 pl-2">
-              <span className="text-xs text-purple-200">
-                {user.displayName}{" "}
-                <span className="rounded bg-purple-700 px-1 py-0.5 text-purple-100">
-                  {user.role}
+          {!authLoading && (
+            <div
+              className={`flex items-center gap-2 ${user ? "border-l border-purple-600 pl-2" : ""}`}
+            >
+              {user && (
+                <span className="text-xs text-purple-200">
+                  {user.displayName}{" "}
+                  <span className="rounded bg-purple-700 px-1 py-0.5 text-purple-100">
+                    {user.role}
+                  </span>
                 </span>
-              </span>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

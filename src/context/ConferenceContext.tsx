@@ -121,6 +121,7 @@ interface ConferenceContextValue {
   conference: Conference | null;
   activeCommittee: Committee | null;
   loading: boolean;
+  conferenceUnavailable: boolean;
   syncError: string | null;
   clearSyncError: () => void;
   initConference: (name: string, year: number) => Promise<void>;
@@ -192,6 +193,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   const [conference, setConference] = useState<Conference | null>(null);
   const [activeCommitteeId, setActiveCommitteeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [conferenceUnavailable, setConferenceUnavailable] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // Keep a stable ref to latest conference for debounced callbacks
@@ -243,6 +245,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
+      setLoading(false);
       return;
     }
 
@@ -250,9 +253,13 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       try {
         const r = await fetch("/api/conference");
         if (!r.ok) {
+          if (r.status === 404) {
+            setConferenceUnavailable(true);
+          }
           setLoading(false);
           return;
         }
+        setConferenceUnavailable(false);
         const data = await r.json();
         // data = { id, name, year, createdAt, updatedAt, committees: [{id, name, type, topic, version, createdAt}] }
 
@@ -862,6 +869,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         conference,
         activeCommittee,
         loading: user ? loading : false,
+        conferenceUnavailable,
         syncError,
         clearSyncError: () => setSyncError(null),
         initConference,

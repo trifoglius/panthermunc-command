@@ -246,13 +246,13 @@ export default function AdminUsersPage() {
               label="Username"
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
-              placeholder="e.g. registrar"
+              placeholder="e.g. who_chair"
             />
             <Input
               label="Display Name"
               value={newDisplayName}
               onChange={(e) => setNewDisplayName(e.target.value)}
-              placeholder="e.g. Awards Registrar"
+              placeholder="e.g. WHO Chair"
             />
             <Input
               label="Password"

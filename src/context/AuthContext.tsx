@@ -24,8 +24,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: SessionData | null) => setUser(data))
+      .then(async (r) => {
+        if (!r.ok) {
+          // Clear stale session (e.g. after conference deletion cascades users)
+          await fetch("/api/auth/logout", { method: "POST" });
+          return null;
+        }
+        return r.json() as Promise<SessionData>;
+      })
+      .then((data) => setUser(data))
       .catch(() => setUser(null))
       .finally(() => setAuthLoading(false));
   }, []);

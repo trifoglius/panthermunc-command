@@ -35,21 +35,24 @@ export async function requireSession(): Promise<SessionData> {
     throw new AuthError("Not authenticated", 401);
   }
 
-  if (!session.permissions?.length) {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, session.userId))
-      .limit(1);
-    if (!user) {
-      throw new AuthError("Not authenticated", 401);
-    }
-    session.role = user.role as UserRole;
-    session.permissions = normalizePermissions(user.permissions ?? []);
-    session.committeeId = user.committeeId ?? null;
-    session.displayName = user.displayName;
-    await session.save();
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+
+  if (!user) {
+    session.destroy();
+    throw new AuthError("Not authenticated", 401);
   }
+
+  session.username = user.username;
+  session.role = user.role as UserRole;
+  session.permissions = normalizePermissions(user.permissions ?? []);
+  session.conferenceId = user.conferenceId;
+  session.committeeId = user.committeeId ?? null;
+  session.displayName = user.displayName;
+  await session.save();
 
   return session as SessionData;
 }

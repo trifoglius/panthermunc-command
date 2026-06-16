@@ -189,9 +189,15 @@ function CommitteeWorkspace() {
 }
 
 export default function Home() {
-  const { user, authLoading } = useAuth();
-  const { conference, loading, activeCommittee, syncError, clearSyncError } =
-    useConference();
+  const { user, authLoading, logout } = useAuth();
+  const {
+    conference,
+    loading,
+    conferenceUnavailable,
+    activeCommittee,
+    syncError,
+    clearSyncError,
+  } = useConference();
   const { notifications, dismiss, dismissAll } = useNotifications(
     !authLoading && !loading && !!user
   );
@@ -262,11 +268,20 @@ export default function Home() {
         ) : (
           <div className="mx-auto max-w-2xl px-4 py-12 text-center">
             <p className="text-xl font-semibold text-purple-900">
-              No committees yet
+              {conferenceUnavailable
+                ? "Conference no longer available"
+                : "No committees yet"}
             </p>
             <p className="mt-2 text-purple-600">
-              Ask your conference admin to set up the conference.
+              {conferenceUnavailable
+                ? "This conference has been removed. Sign out to return to the login page."
+                : "Ask your conference admin to set up the conference."}
             </p>
+            <div className="mt-6">
+              <Button variant="secondary" onClick={logout}>
+                Sign Out
+              </Button>
+            </div>
           </div>
         )
       ) : (
