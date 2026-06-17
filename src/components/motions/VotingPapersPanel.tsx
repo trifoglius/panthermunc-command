@@ -9,6 +9,7 @@ import {
   requiredYesForSupermajority,
   isVoteByRollCall,
 } from "@/lib/voting";
+import { firePassingVoteConfetti } from "@/lib/confetti";
 import type { Motion, PaperVoteRecord } from "@/lib/types";
 
 export function VotingPapersPanel({ motion }: { motion: Motion }) {
@@ -90,18 +91,23 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
   );
 
   const applyResults = () => {
+    let anyPassed = false;
     for (const vote of votes) {
       const doc = activeCommittee.documents.find(
         (d) => d.id === vote.documentId
       );
       if (!doc) continue;
       const passes = draftResolutionPasses(vote.votesFor, vote.votesAgainst);
+      if (passes) anyPassed = true;
       updateDocument({
         ...doc,
         status: passes ? "adopted" : "failed",
       });
     }
     setApplied(true);
+    if (anyPassed) {
+      firePassingVoteConfetti();
+    }
   };
 
   return (
