@@ -11,7 +11,6 @@ import {
 import { Header } from "@/components/layout/Header";
 import { MotionPanel } from "@/components/motions/MotionPanel";
 import { MotionQueuesPanel } from "@/components/motions/MotionQueuesPanel";
-import { PointsPanel } from "@/components/points/PointsPanel";
 import { RollCallPanel } from "@/components/rollcall/RollCallPanel";
 import { ScoringPanel } from "@/components/scoring/ScoringPanel";
 import { StatsPanel } from "@/components/stats/StatsPanel";
@@ -162,7 +161,6 @@ function CommitteeWorkspace() {
     motions: <MotionPanel />,
     motion_queues: <MotionQueuesPanel />,
     documents: <DocumentPanel />,
-    points: <PointsPanel />,
     scoring: <ScoringPanel />,
     stats: <StatsPanel />,
   };

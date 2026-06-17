@@ -270,9 +270,11 @@ export function MotionPanel() {
             ))}
           </div>
         )}
-      </Card>
 
-      <PointsPanel />
+        <div className="mt-6 border-t border-purple-200 pt-6">
+          <PointsPanel />
+        </div>
+      </Card>
     </div>
   );
 }

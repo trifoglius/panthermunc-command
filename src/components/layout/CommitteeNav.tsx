@@ -11,7 +11,6 @@ const TABS = [
   { id: "motions", label: "Motions", perm: "committee:operate" as const },
   { id: "motion_queues", label: "Motion Queues", perm: "committee:operate" as const },
   { id: "documents", label: "Documents", perm: "committee:operate" as const },
-  { id: "points", label: "Points", perm: "committee:operate" as const },
   { id: "scoring", label: "Scoring", perm: "scoring:edit" as const },
   { id: "stats", label: "Stats & Export", perm: "committee:operate" as const },
 ] as const;
