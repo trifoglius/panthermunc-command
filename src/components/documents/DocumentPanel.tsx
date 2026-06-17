@@ -4,6 +4,11 @@ import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { DelegateMultiSelect } from "@/components/delegates/DelegateMultiSelect";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import {
+  getDocumentTypeLabel,
+  getDocumentsBySubmissionOrder,
+  getStatusBadgeColor,
+} from "@/lib/documents";
 import type { Document, DocumentStatus, DocumentType } from "@/lib/types";
 
 export function DocumentPanel() {
@@ -112,6 +117,31 @@ export function DocumentPanel() {
         </div>
       </Card>
 
+      {getDocumentsBySubmissionOrder(activeCommittee).length > 0 && (
+        <Card title="Order Received by Dais">
+          <p className="mb-3 text-sm text-purple-700">
+            Draft resolutions in the order they were submitted to the dais. Use
+            this when presenting or voting on papers in order received.
+          </p>
+          <ol className="space-y-2">
+            {getDocumentsBySubmissionOrder(activeCommittee).map((doc) => (
+              <li
+                key={doc.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-purple-100 px-3 py-2"
+              >
+                <span className="text-sm text-purple-900">
+                  <span className="mr-2 font-medium text-purple-600">
+                    {doc.submissionNumber}.
+                  </span>
+                  {doc.title}
+                </span>
+                <Badge color="purple">{getDocumentTypeLabel(doc)}</Badge>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
       <Card title="Documents">
         {activeCommittee.documents.length === 0 ? (
           <p className="text-sm text-purple-600">No documents yet.</p>
@@ -182,11 +212,17 @@ function DocumentRow({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-purple-900">{doc.title}</p>
+          {doc.submissionNumber !== undefined && (
+            <p className="text-xs text-purple-600">
+              Received #{doc.submissionNumber}
+              {doc.submittedAt
+                ? ` · ${new Date(doc.submittedAt).toLocaleString()}`
+                : ""}
+            </p>
+          )}
           <div className="mt-1 flex flex-wrap gap-2">
-            <Badge color="purple">
-              {doc.type === "working_paper" ? "Working Paper" : "Draft Res."}
-            </Badge>
-            <Badge color="gray">{doc.status}</Badge>
+            <Badge color="purple">{getDocumentTypeLabel(doc)}</Badge>
+            <Badge color={getStatusBadgeColor(doc.status)}>{doc.status}</Badge>
           </div>
           {!editing && (
             <>

@@ -28,7 +28,7 @@ export function getCommitteeStats(committee: Committee) {
 
   const passedMotions = getPassedMotions(committee);
   const adoptedResolutions = committee.documents.filter(
-    (d) => d.type === "draft_resolution" && d.status === "adopted"
+    (d) => d.type === "resolution" || d.status === "adopted"
   ).length;
 
   return {

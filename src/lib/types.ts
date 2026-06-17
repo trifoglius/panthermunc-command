@@ -2,7 +2,7 @@ export type CommitteeType = "ga" | "crisis" | "specialized";
 export type PositionPaperStatus = "epp" | "lpp" | "none";
 export type RollCallStatus = "present" | "present_voting" | "absent";
 export type MotionStatus = "pending" | "passed" | "failed" | "withdrawn";
-export type DocumentType = "working_paper" | "draft_resolution";
+export type DocumentType = "working_paper" | "draft_resolution" | "resolution";
 export type DocumentStatus =
   | "draft"
   | "submitted"
@@ -63,6 +63,7 @@ export interface Document {
   link?: string;
   amendments: Amendment[];
   submittedAt?: string;
+  submissionNumber?: number;
   sourceWorkingPaperId?: string;
 }
 
@@ -150,6 +151,7 @@ export interface Committee {
   vcRecipientId?: string;
   discrepancyThreshold: number;
   requirePositionPapers: boolean;
+  nextDraftSubmissionOrder?: number;
   createdAt: string;
 }
 

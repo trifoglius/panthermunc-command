@@ -9,6 +9,7 @@ import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
 import { computeMotionDisruptivity } from "@/lib/motion-disruptivity";
 import { motionHasActiveSession } from "@/lib/motion-timers";
 import { parseDocumentOrder } from "@/lib/voting";
+import { isActiveDraftResolution, getSubmissionOrderIds } from "@/lib/documents";
 import type { MotionField } from "@/lib/constants";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
@@ -33,9 +34,8 @@ export function MotionPanel() {
     (m) => m.id === activeMotionId
   );
 
-  const draftResolutions = activeCommittee.documents.filter(
-    (doc) => doc.type === "draft_resolution"
-  );
+  const draftResolutions = activeCommittee.documents.filter(isActiveDraftResolution);
+  const submissionOrderIds = getSubmissionOrderIds(activeCommittee);
 
   const visibleFields = selectedMotion.fields.filter((field) => {
     if (!field.showWhen) return true;
@@ -67,6 +67,7 @@ export function MotionPanel() {
               setDetails({ ...details, [field.key]: value })
             }
             documents={draftResolutions}
+            submissionOrderIds={submissionOrderIds}
           />
         </div>
       );

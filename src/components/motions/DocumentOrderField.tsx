@@ -13,11 +13,13 @@ export function DocumentOrderField({
   value,
   onChange,
   documents,
+  submissionOrderIds,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   documents: Document[];
+  submissionOrderIds?: string[];
 }) {
   const orderedIds = parseDocumentOrder(value);
   const [addId, setAddId] = useState("");
@@ -42,6 +44,16 @@ export function DocumentOrderField({
     onChange(serializeDocumentOrder(next));
   };
 
+  const useSubmissionOrder = () => {
+    if (!submissionOrderIds?.length) return;
+    const availableIds = new Set(documents.map((d) => d.id));
+    const ordered = submissionOrderIds.filter((id) => availableIds.has(id));
+    onChange(serializeDocumentOrder(ordered));
+  };
+
+  const eligibleSubmissionOrder =
+    submissionOrderIds?.filter((id) => documents.some((d) => d.id === id)) ?? [];
+
   return (
     <div className="rounded-md border border-purple-100 p-3">
       <p className="mb-2 text-sm font-medium text-purple-900">{label}</p>
@@ -59,6 +71,11 @@ export function DocumentOrderField({
         <Button onClick={addDocument} disabled={!addId} size="sm">
           Add
         </Button>
+        {eligibleSubmissionOrder.length > 0 && (
+          <Button onClick={useSubmissionOrder} size="sm" variant="secondary">
+            Use order received
+          </Button>
+        )}
       </div>
       {orderedIds.length === 0 ? (
         <p className="text-sm text-purple-600">No documents added yet.</p>

@@ -9,6 +9,7 @@ import {
   requiredYesForSupermajority,
   isVoteByRollCall,
 } from "@/lib/voting";
+import { normalizeDocumentUpdate } from "@/lib/documents";
 import { firePassingVoteConfetti } from "@/lib/confetti";
 import type { Motion, PaperVoteRecord } from "@/lib/types";
 
@@ -99,10 +100,12 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
       if (!doc) continue;
       const passes = draftResolutionPasses(vote.votesFor, vote.votesAgainst);
       if (passes) anyPassed = true;
-      updateDocument({
-        ...doc,
-        status: passes ? "adopted" : "failed",
-      });
+      updateDocument(
+        normalizeDocumentUpdate({
+          ...doc,
+          status: passes ? "adopted" : "failed",
+        })
+      );
     }
     setApplied(true);
     if (anyPassed) {
