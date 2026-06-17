@@ -1,4 +1,4 @@
-import type { Committee, RollCallSession } from "./types";
+import type { Committee, Delegate, RollCallSession } from "./types";
 
 /** Returns true if the delegate is present or present & voting on the latest roll call. */
 export function isDelegatePresent(
@@ -31,4 +31,27 @@ export function computeQuorumMet(
   totalDelegates: number
 ): boolean {
   return countPresent(session) > totalDelegates / 2;
+}
+
+export function getLatestRollCall(committee: Committee): RollCallSession | null {
+  return committee.rollCalls[0] ?? null;
+}
+
+/** Delegates eligible for roll-call voting (present or present & voting). */
+export function getRollCallVotingDelegates(
+  committee: Committee,
+  session: RollCallSession
+): Delegate[] {
+  return committee.delegates.filter((d) => {
+    const status = session.attendance[d.id];
+    return status === "present" || status === "present_voting";
+  });
+}
+
+/** Present (non-voting) delegates may abstain; present & voting delegates may not. */
+export function canDelegateAbstainOnRollCall(
+  session: RollCallSession,
+  delegateId: string
+): boolean {
+  return session.attendance[delegateId] === "present";
 }

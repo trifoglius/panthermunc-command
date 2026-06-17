@@ -99,11 +99,15 @@ export interface PositionPaperScore {
   notes: string;
 }
 
+export type DelegatePaperVote = "yes" | "no" | "abstain";
+
 export interface MotionSessionState {
   speakerQueue?: string[];
   speakersFor?: string[];
   speakersAgainst?: string[];
   paperVotes?: PaperVoteRecord[];
+  /** documentId → delegateId → vote */
+  rollCallVotes?: Record<string, Record<string, DelegatePaperVote>>;
   presentationDelegates?: string[];
   qaDelegates?: string[];
 }

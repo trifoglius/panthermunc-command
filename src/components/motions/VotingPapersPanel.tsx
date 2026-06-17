@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { Badge, Button, Input } from "@/components/ui";
 import {
   parseDocumentOrder,
   draftResolutionPasses,
   requiredYesForSupermajority,
+  isVoteByRollCall,
 } from "@/lib/voting";
 import type { Motion, PaperVoteRecord } from "@/lib/types";
 
@@ -34,6 +35,22 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
     );
   });
   const [applied, setApplied] = useState(false);
+  const rollCallMode = isVoteByRollCall(motion);
+
+  useEffect(() => {
+    const byId = new Map(savedVotes.map((v) => [v.documentId, v]));
+    setVotes(
+      paperIds.map(
+        (id) =>
+          byId.get(id) ?? {
+            documentId: id,
+            votesFor: 0,
+            votesAgainst: 0,
+            votesAbstain: 0,
+          }
+      )
+    );
+  }, [savedVotes, paperIds]);
 
   if (!activeCommittee) return null;
 
@@ -91,9 +108,9 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
     <div className="mt-4 border-t border-purple-100 pt-4">
       <h4 className="mb-1 font-semibold text-purple-900">Paper Votes</h4>
       <p className="mb-3 text-sm text-purple-600">
-        Log yes, no, and abstain counts for each draft resolution. Abstentions
-        are excluded when determining the two-thirds majority required for
-        adoption.
+        {rollCallMode
+          ? "Vote counts are filled automatically from roll call voting above."
+          : "Log yes, no, and abstain counts for each draft resolution. Abstentions are excluded when determining the two-thirds majority required for adoption."}
       </p>
       <div className="space-y-4">
         {votes.map((vote, index) => {
@@ -130,6 +147,7 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
                   type="number"
                   min={0}
                   value={vote.votesFor || ""}
+                  readOnly={rollCallMode}
                   onChange={(e) =>
                     updateVote(vote.documentId, "votesFor", e.target.value)
                   }
@@ -139,6 +157,7 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
                   type="number"
                   min={0}
                   value={vote.votesAgainst || ""}
+                  readOnly={rollCallMode}
                   onChange={(e) =>
                     updateVote(vote.documentId, "votesAgainst", e.target.value)
                   }
@@ -148,6 +167,7 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
                   type="number"
                   min={0}
                   value={vote.votesAbstain || ""}
+                  readOnly={rollCallMode}
                   onChange={(e) =>
                     updateVote(vote.documentId, "votesAbstain", e.target.value)
                   }

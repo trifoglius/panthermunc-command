@@ -1,3 +1,11 @@
+import type { DelegatePaperVote, Motion, PaperVoteRecord } from "./types";
+
+export const VOTE_BY_ROLL_CALL = "Vote by Roll Call";
+
+export function isVoteByRollCall(motion: Motion): boolean {
+  return motion.details.vote_manner === VOTE_BY_ROLL_CALL;
+}
+
 /** Parse comma-separated document IDs from a motion detail field. */
 export function parseDocumentOrder(value?: string): string[] {
   if (!value?.trim()) return [];
@@ -35,4 +43,18 @@ export function requiredYesForSupermajority(votesFor: number, votesAgainst: numb
   const votesCast = votesFor + votesAgainst;
   if (votesCast === 0) return 0;
   return Math.ceil((votesCast * 2) / 3);
+}
+
+export function aggregateDelegateVotes(
+  votes: Record<string, DelegatePaperVote>
+): Omit<PaperVoteRecord, "documentId"> {
+  let votesFor = 0;
+  let votesAgainst = 0;
+  let votesAbstain = 0;
+  for (const vote of Object.values(votes)) {
+    if (vote === "yes") votesFor++;
+    else if (vote === "no") votesAgainst++;
+    else votesAbstain++;
+  }
+  return { votesFor, votesAgainst, votesAbstain };
 }

@@ -16,6 +16,7 @@ import type {
   Point,
   PositionPaperStatus,
   PaperVoteRecord,
+  DelegatePaperVote,
   RollCallStatus,
   ScorerRole,
   SpeakingEvent,
@@ -147,6 +148,27 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
       const cid = requireCommittee();
       patchCommittee(cid, (c) =>
         motionMutations.setMotionPaperVotes(c, motionId, paperVotes)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const setMotionRollCallVote = useCallback(
+    (
+      motionId: string,
+      documentId: string,
+      delegateId: string,
+      vote: DelegatePaperVote
+    ) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        motionMutations.setMotionRollCallVote(
+          c,
+          motionId,
+          documentId,
+          delegateId,
+          vote
+        )
       );
     },
     [patchCommittee, requireCommittee]
@@ -315,6 +337,7 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     setMotionSpeakerQueue,
     setMotionVotingSpeakers,
     setMotionPaperVotes,
+    setMotionRollCallVote,
     setMotionPresentationDelegates,
     archiveMotionQueue,
     addDocument,

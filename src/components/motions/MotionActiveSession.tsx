@@ -2,11 +2,13 @@
 
 import { useSessionTimers } from "@/hooks/useSessionTimers";
 import { VotingPapersPanel } from "@/components/motions/VotingPapersPanel";
+import { RollCallVotingPanel } from "@/components/motions/RollCallVotingPanel";
 import { PresentationSession } from "@/components/motions/PresentationSession";
 import { TimerDisplay } from "@/components/motions/TimerControls";
 import { SpeakerQueue } from "@/components/motions/SpeakerQueue";
 import { VotingSpeakerQueue } from "@/components/motions/VotingSpeakerQueue";
 import { getMotionTypeId, getTimerConfig, type MotionTimerConfig } from "@/lib/motion-timers";
+import { isVoteByRollCall } from "@/lib/voting";
 import type { Motion } from "@/lib/types";
 import { Badge, Button, Card } from "@/components/ui";
 
@@ -33,6 +35,9 @@ export function MotionActiveSession({
         </Button>
       </div>
       {config && <MotionActiveSessionBody motion={motion} config={config} />}
+      {isVotingProcedure && isVoteByRollCall(motion) && (
+        <RollCallVotingPanel motion={motion} />
+      )}
       {isVotingProcedure && <VotingPapersPanel motion={motion} />}
     </Card>
   );

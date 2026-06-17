@@ -3,8 +3,10 @@ import {
   getMotionTypeId,
   isAffirmative,
 } from "@/lib/motion-timers";
+import { parseDocumentOrder, aggregateDelegateVotes } from "@/lib/voting";
 import type {
   Committee,
+  DelegatePaperVote,
   Motion,
   MotionQueueSnapshot,
   PaperVoteRecord,
@@ -68,6 +70,54 @@ export function setMotionPaperVotes(
       ...(committee.motionSessionState ?? {}),
       [motionId]: {
         ...(committee.motionSessionState?.[motionId] ?? {}),
+        paperVotes,
+      },
+    },
+  };
+}
+
+export function setMotionRollCallVote(
+  committee: Committee,
+  motionId: string,
+  documentId: string,
+  delegateId: string,
+  vote: DelegatePaperVote
+): Committee {
+  const motion = committee.motions.find((m) => m.id === motionId);
+  const motionState = committee.motionSessionState?.[motionId] ?? {};
+  const existingRollCall = motionState.rollCallVotes ?? {};
+  const docVotes = {
+    ...(existingRollCall[documentId] ?? {}),
+    [delegateId]: vote,
+  };
+  const rollCallVotes = { ...existingRollCall, [documentId]: docVotes };
+
+  const paperIds = motion ? parseDocumentOrder(motion.details.paper_order) : [];
+  const existingPaperVotes = motionState.paperVotes ?? [];
+  const byId = new Map(existingPaperVotes.map((v) => [v.documentId, v]));
+
+  const paperVotes = paperIds.map((id) => {
+    const delegateVotes = rollCallVotes[id];
+    if (delegateVotes) {
+      return { documentId: id, ...aggregateDelegateVotes(delegateVotes) };
+    }
+    return (
+      byId.get(id) ?? {
+        documentId: id,
+        votesFor: 0,
+        votesAgainst: 0,
+        votesAbstain: 0,
+      }
+    );
+  });
+
+  return {
+    ...committee,
+    motionSessionState: {
+      ...(committee.motionSessionState ?? {}),
+      [motionId]: {
+        ...motionState,
+        rollCallVotes,
         paperVotes,
       },
     },

@@ -9,6 +9,7 @@ import type {
   Point,
   PositionPaperStatus,
   PaperVoteRecord,
+  DelegatePaperVote,
   RollCallStatus,
   ScorerRole,
   SpeakingEvent,
@@ -60,6 +61,12 @@ export interface ConferenceContextValue {
     speakersAgainst: string[]
   ) => void;
   setMotionPaperVotes: (motionId: string, paperVotes: PaperVoteRecord[]) => void;
+  setMotionRollCallVote: (
+    motionId: string,
+    documentId: string,
+    delegateId: string,
+    vote: DelegatePaperVote
+  ) => void;
   setMotionPresentationDelegates: (
     motionId: string,
     presentationDelegates: string[],
