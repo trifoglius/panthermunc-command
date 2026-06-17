@@ -239,7 +239,7 @@ export function MotionPanel() {
         </div>
       </Card>
 
-      <Card title="Motion Queue (by Disruptivity)">
+      <Card title="Motion Queue">
         {passedMotions.length > 0 && sortedMotions.length > 0 && (
           <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3">
             <p className="text-sm text-green-900">
@@ -270,11 +270,9 @@ export function MotionPanel() {
             ))}
           </div>
         )}
-
-        <div className="mt-6 border-t border-purple-200 pt-6">
-          <PointsPanel />
-        </div>
       </Card>
+
+      <PointsPanel />
     </div>
   );
 }

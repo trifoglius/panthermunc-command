@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
-import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Select, Textarea } from "@/components/ui";
 import type { PointType } from "@/lib/types";
 
 export function PointsPanel() {
@@ -27,57 +27,58 @@ export function PointsPanel() {
   const resolved = activeCommittee.points.filter((p) => p.resolved);
 
   return (
-    <div className="space-y-4">
-      <Card title="Log Point (Rules 24–26)">
-        <p className="mb-3 text-sm text-purple-700">
-          Record points of order, personal privilege, and inquiry raised during
-          committee.
-        </p>
-        <div className="grid gap-3 md:grid-cols-2">
-          <Select
-            label="Point Type"
-            value={pointType}
-            onChange={(e) => setPointType(e.target.value as PointType)}
-            options={[
-              { value: "order", label: "Point of Order (Rule 24)" },
-              {
-                value: "privilege",
-                label: "Point of Personal Privilege (Rule 25)",
-              },
-              { value: "inquiry", label: "Point of Inquiry (Rule 26)" },
-            ]}
-          />
-          <Select
-            label="Delegate"
-            value={pointDelegate}
-            onChange={(e) => setPointDelegate(e.target.value)}
-            options={[
-              { value: "", label: "Select..." },
-              ...activeCommittee.delegates.map((d) => ({
-                value: d.id,
-                label: d.country,
-              })),
-            ]}
-          />
-        </div>
-        <div className="mt-3">
-          <Textarea
-            label="Description"
-            value={pointDesc}
-            onChange={(e) => setPointDesc(e.target.value)}
-            rows={3}
-            placeholder="Describe the point raised..."
-          />
-        </div>
-        <div className="mt-3">
-          <Button onClick={logPoint} disabled={!pointDelegate || !pointDesc.trim()}>
-            Log Point
-          </Button>
-        </div>
-      </Card>
+    <Card title="Points (Rules 24–26)">
+      <p className="mb-3 text-sm text-purple-700">
+        Record points of order, personal privilege, and inquiry raised during
+        committee.
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Select
+          label="Point Type"
+          value={pointType}
+          onChange={(e) => setPointType(e.target.value as PointType)}
+          options={[
+            { value: "order", label: "Point of Order (Rule 24)" },
+            {
+              value: "privilege",
+              label: "Point of Personal Privilege (Rule 25)",
+            },
+            { value: "inquiry", label: "Point of Inquiry (Rule 26)" },
+          ]}
+        />
+        <Select
+          label="Delegate"
+          value={pointDelegate}
+          onChange={(e) => setPointDelegate(e.target.value)}
+          options={[
+            { value: "", label: "Select..." },
+            ...activeCommittee.delegates.map((d) => ({
+              value: d.id,
+              label: d.country,
+            })),
+          ]}
+        />
+      </div>
+      <div className="mt-3">
+        <Textarea
+          label="Description"
+          value={pointDesc}
+          onChange={(e) => setPointDesc(e.target.value)}
+          rows={3}
+          placeholder="Describe the point raised..."
+        />
+      </div>
+      <div className="mt-3">
+        <Button onClick={logPoint} disabled={!pointDelegate || !pointDesc.trim()}>
+          Log Point
+        </Button>
+      </div>
 
       {unresolved.length > 0 && (
-        <Card title={`Open Points (${unresolved.length})`}>
+        <div className="mt-6 border-t border-purple-200 pt-4">
+          <h3 className="mb-3 text-sm font-semibold text-purple-900">
+            Open Points ({unresolved.length})
+          </h3>
           <ul className="space-y-2">
             {unresolved.map((p) => {
               const d = activeCommittee.delegates.find(
@@ -95,11 +96,20 @@ export function PointsPanel() {
               );
             })}
           </ul>
-        </Card>
+        </div>
       )}
 
       {resolved.length > 0 && (
-        <Card title="Resolved Points">
+        <div
+          className={`${
+            unresolved.length > 0
+              ? "mt-4 border-t border-purple-200 pt-4"
+              : "mt-6 border-t border-purple-200 pt-4"
+          }`}
+        >
+          <h3 className="mb-3 text-sm font-semibold text-purple-900">
+            Resolved Points
+          </h3>
           <ul className="space-y-2">
             {resolved.map((p) => {
               const d = activeCommittee.delegates.find(
@@ -117,15 +127,15 @@ export function PointsPanel() {
               );
             })}
           </ul>
-        </Card>
+        </div>
       )}
 
       {activeCommittee.points.length === 0 && (
-        <p className="text-center text-sm text-purple-600">
+        <p className="mt-6 border-t border-purple-200 pt-4 text-center text-sm text-purple-600">
           No points logged yet.
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
