@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { MotionActiveSession } from "@/components/motions/MotionActiveSession";
 import { DocumentOrderField } from "@/components/motions/DocumentOrderField";
+import { PointsPanel } from "@/components/points/PointsPanel";
 import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
 import { computeMotionDisruptivity } from "@/lib/motion-disruptivity";
 import { motionHasActiveSession } from "@/lib/motion-timers";
@@ -270,6 +271,8 @@ export function MotionPanel() {
           </div>
         )}
       </Card>
+
+      <PointsPanel />
     </div>
   );
 }

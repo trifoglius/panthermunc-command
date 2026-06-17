@@ -20,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { hasPermission, canAccessAllCommittees } from "@/lib/permissions";
 import type { CommitteeType } from "@/lib/types";
+import { countPresent } from "@/lib/rollcall";
 import { getVoteThresholds } from "@/lib/voting";
 
 // Admin-only setup screen shown when no committees exist yet
@@ -123,11 +124,9 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
   const latestRollCall = committee.rollCalls[0] ?? null;
   if (!latestRollCall) return null;
 
-  const presentVoting = Object.values(latestRollCall.attendance).filter(
-    (s) => s === "present_voting"
-  ).length;
+  const votingBase = countPresent(latestRollCall);
 
-  const { simpleMajority, superMajority } = getVoteThresholds(presentVoting);
+  const { simpleMajority, superMajority } = getVoteThresholds(votingBase);
 
   return (
     <div className="mt-2 flex flex-wrap gap-4 text-sm">
@@ -135,10 +134,10 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
         Based on latest roll call ({latestRollCall.label}):
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Simple majority: {simpleMajority} votes ({presentVoting} P&amp;V)
+        Simple majority: {simpleMajority} votes ({votingBase} present + P&amp;V)
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Supermajority ⅔: {superMajority} votes ({presentVoting} P&amp;V)
+        Supermajority ⅔: {superMajority} votes ({votingBase} present + P&amp;V)
       </span>
     </div>
   );

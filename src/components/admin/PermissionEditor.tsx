@@ -15,11 +15,13 @@ export function PermissionEditor({
   permissions,
   onRoleChange,
   onPermissionsChange,
+  collapsible = false,
 }: {
   role: UserRole;
   permissions: Permission[];
   onRoleChange: (role: UserRole) => void;
   onPermissionsChange: (permissions: Permission[]) => void;
+  collapsible?: boolean;
 }) {
   const applyTemplate = (nextRole: UserRole) => {
     onRoleChange(nextRole);
@@ -35,6 +37,20 @@ export function PermissionEditor({
     onPermissionsChange(next);
     onRoleChange(detectRoleFromPermissions(next));
   };
+
+  const permissionMatrix = (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {PERMISSIONS.map((perm) => (
+        <Checkbox
+          key={perm}
+          label={PERMISSION_META[perm].label}
+          description={PERMISSION_META[perm].description}
+          checked={permissions.includes(perm)}
+          onChange={(e) => togglePermission(perm, e.target.checked)}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-3">
@@ -54,17 +70,25 @@ export function PermissionEditor({
           </button>
         ))}
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {PERMISSIONS.map((perm) => (
-          <Checkbox
-            key={perm}
-            label={PERMISSION_META[perm].label}
-            description={PERMISSION_META[perm].description}
-            checked={permissions.includes(perm)}
-            onChange={(e) => togglePermission(perm, e.target.checked)}
-          />
-        ))}
-      </div>
+      {collapsible ? (
+        <details className="group rounded-md border border-purple-200 bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-purple-900 marker:content-none [&::-webkit-details-marker]:hidden">
+            <span>Permission details</span>
+            <span className="text-xs font-normal text-purple-500">
+              {permissions.length} of {PERMISSIONS.length} enabled
+            </span>
+            <span
+              aria-hidden
+              className="text-purple-400 transition-transform group-open:rotate-180"
+            >
+              ▾
+            </span>
+          </summary>
+          <div className="border-t border-purple-100 p-3">{permissionMatrix}</div>
+        </details>
+      ) : (
+        permissionMatrix
+      )}
     </div>
   );
 }

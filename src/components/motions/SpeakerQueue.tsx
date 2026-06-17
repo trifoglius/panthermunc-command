@@ -54,7 +54,13 @@ export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
   const addSpeaker = () => {
     if (!addId || pendingIds.includes(addId)) return;
     updateQueue(
-      addSpeakerWithReserve(queue, addId, motion.proposedBy, motion.details.speak_order)
+      addSpeakerWithReserve(
+        queue,
+        addId,
+        motion.proposedBy,
+        motion.details.speak_order,
+        currentIndex
+      )
     );
     setAddId("");
   };
@@ -150,7 +156,8 @@ export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
                         applySpeakOrderReserve(
                           queue.filter((_, idx) => idx !== i),
                           motion.proposedBy,
-                          motion.details.speak_order
+                          motion.details.speak_order,
+                          currentIndex
                         )
                       )
                     }

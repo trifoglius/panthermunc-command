@@ -12,13 +12,14 @@ export function serializeDocumentOrder(ids: string[]): string {
 }
 
 /**
- * Thresholds assuming every present-and-voting delegate casts a yes/no vote
- * (no abstentions). Abstentions are excluded when tallying actual paper votes.
+ * Thresholds based on the number of present + present-and-voting delegates,
+ * assuming each casts a yes/no vote (no abstentions). Abstentions are excluded
+ * when tallying actual paper votes.
  */
-export function getVoteThresholds(presentVoting: number) {
+export function getVoteThresholds(votingBase: number) {
   return {
-    simpleMajority: Math.floor(presentVoting / 2) + 1,
-    superMajority: Math.ceil((presentVoting * 2) / 3),
+    simpleMajority: Math.floor(votingBase / 2) + 1,
+    superMajority: Math.ceil((votingBase * 2) / 3),
   };
 }
 

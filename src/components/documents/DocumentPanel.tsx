@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
+import { DelegateMultiSelect } from "@/components/delegates/DelegateMultiSelect";
 import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 import type { Document, DocumentStatus, DocumentType } from "@/lib/types";
 
@@ -132,40 +133,6 @@ export function DocumentPanel() {
   );
 }
 
-function DelegateMultiSelect({
-  label,
-  delegates,
-  selected,
-  onToggle,
-}: {
-  label: string;
-  delegates: { id: string; country: string }[];
-  selected: string[];
-  onToggle: (id: string) => void;
-}) {
-  return (
-    <div className="mt-3">
-      <p className="mb-1 text-sm font-medium text-purple-900">{label}</p>
-      <div className="flex flex-wrap gap-2">
-        {delegates.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => onToggle(d.id)}
-            className={`rounded-full border px-3 py-1 text-sm ${
-              selected.includes(d.id)
-                ? "border-purple-700 bg-purple-700 text-white"
-                : "border-purple-200 bg-white text-purple-800"
-            }`}
-          >
-            {d.country}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function DocumentRow({
   doc,
   committee,
@@ -177,6 +144,14 @@ function DocumentRow({
   onUpdate: (d: Document) => void;
   onPromote: (id: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [sponsors, setSponsors] = useState(doc.sponsors);
+  const [signatories, setSignatories] = useState(doc.signatories);
+  const [authorPanel, setAuthorPanel] = useState(doc.authorPanel);
+
+  const toggleId = (list: string[], id: string) =>
+    list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+
   const country = (ids: string[]) =>
     ids
       .map((id) => committee.delegates.find((d) => d.id === id)?.country ?? id)
@@ -190,6 +165,18 @@ function DocumentRow({
     "failed",
   ];
 
+  const startEditing = () => {
+    setSponsors(doc.sponsors);
+    setSignatories(doc.signatories);
+    setAuthorPanel(doc.authorPanel);
+    setEditing(true);
+  };
+
+  const saveEditing = () => {
+    onUpdate({ ...doc, sponsors, signatories, authorPanel });
+    setEditing(false);
+  };
+
   return (
     <div className="rounded-md border border-purple-100 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -201,15 +188,19 @@ function DocumentRow({
             </Badge>
             <Badge color="gray">{doc.status}</Badge>
           </div>
-          <p className="mt-1 text-sm text-purple-700">
-            Sponsors: {country(doc.sponsors) || "None"}
-          </p>
-          <p className="text-sm text-purple-700">
-            Signatories: {country(doc.signatories) || "None"}
-          </p>
-          <p className="text-sm text-purple-700">
-            Author Panel: {country(doc.authorPanel) || "None"}
-          </p>
+          {!editing && (
+            <>
+              <p className="mt-1 text-sm text-purple-700">
+                Sponsors: {country(doc.sponsors) || "None"}
+              </p>
+              <p className="text-sm text-purple-700">
+                Signatories: {country(doc.signatories) || "None"}
+              </p>
+              <p className="text-sm text-purple-700">
+                Author Panel: {country(doc.authorPanel) || "None"}
+              </p>
+            </>
+          )}
           {doc.link && (
             <p className="text-sm">
               <a
@@ -223,7 +214,43 @@ function DocumentRow({
             </p>
           )}
         </div>
+        {!editing && (
+          <Button size="sm" variant="secondary" onClick={startEditing}>
+            Edit Delegates
+          </Button>
+        )}
       </div>
+
+      {editing && (
+        <div className="mt-3 rounded-md border border-purple-100 bg-purple-50/50 p-3">
+          <DelegateMultiSelect
+            label="Sponsors (Rule 15)"
+            delegates={committee.delegates}
+            selected={sponsors}
+            onToggle={(id) => setSponsors(toggleId(sponsors, id))}
+          />
+          <DelegateMultiSelect
+            label="Signatories (Rule 15)"
+            delegates={committee.delegates}
+            selected={signatories}
+            onToggle={(id) => setSignatories(toggleId(signatories, id))}
+          />
+          <DelegateMultiSelect
+            label="Author's Panel (Rule 14)"
+            delegates={committee.delegates}
+            selected={authorPanel}
+            onToggle={(id) => setAuthorPanel(toggleId(authorPanel, id))}
+          />
+          <div className="mt-3 flex gap-2">
+            <Button size="sm" onClick={saveEditing}>
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-2">
         <Input

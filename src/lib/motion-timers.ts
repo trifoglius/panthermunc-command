@@ -4,7 +4,11 @@ import type { Motion } from "./types";
 export interface MotionTimerConfig {
   totalSeconds?: number;
   speakingSeconds?: number;
-  phases?: { label: string; seconds: number }[];
+  phases?: {
+    label: string;
+    seconds: number;
+    phaseKind?: "reading" | "presentation" | "qa";
+  }[];
   hasSpeakerQueue: boolean;
   queueMode?: "single" | "for_against";
   speakingEventType: string;
@@ -35,24 +39,36 @@ export function parseVotingSpeakerOrder(value?: string): VotingSpeakerOrder {
 export function applySpeakOrderReserve(
   queue: string[],
   proposedBy: string,
-  speakOrder?: string
+  speakOrder?: string,
+  completedCount = 0
 ): string[] {
   if (!speakOrder || !proposedBy) return queue;
-  const unique = queue.filter((id, index) => queue.indexOf(id) === index);
-  const others = unique.filter((id) => id !== proposedBy);
-  if (speakOrder === "first") return [proposedBy, ...others];
-  if (speakOrder === "last") return [...others, proposedBy];
-  return unique;
+  const completed = queue.slice(0, completedCount);
+  const pending = queue.slice(completedCount);
+  const pendingUnique = pending.filter(
+    (id, index) => pending.indexOf(id) === index
+  );
+  const others = pendingUnique.filter((id) => id !== proposedBy);
+  let reordered: string[];
+  if (speakOrder === "first") reordered = [proposedBy, ...others];
+  else if (speakOrder === "last") reordered = [...others, proposedBy];
+  else reordered = pendingUnique;
+  return [...completed, ...reordered];
 }
 
 export function addSpeakerWithReserve(
   queue: string[],
   speakerId: string,
   proposedBy: string,
-  speakOrder?: string
+  speakOrder?: string,
+  completedCount = 0
 ): string[] {
-  const next = queue.includes(speakerId) ? queue : [...queue, speakerId];
-  return applySpeakOrderReserve(next, proposedBy, speakOrder);
+  return applySpeakOrderReserve(
+    [...queue, speakerId],
+    proposedBy,
+    speakOrder,
+    completedCount
+  );
 }
 
 export function getMotionTypeId(motion: Motion): string | undefined {
@@ -96,12 +112,21 @@ export function getTimerConfig(motion: Motion): MotionTimerConfig | null {
       };
     case "present_draft": {
       const phases = [
-        { label: "Reading Period", seconds: parseMinutes(d.reading_period) },
+        {
+          label: "Reading Period",
+          seconds: parseMinutes(d.reading_period),
+          phaseKind: "reading" as const,
+        },
         {
           label: "Presentation Period",
           seconds: parseMinutes(d.presentation_period),
+          phaseKind: "presentation" as const,
         },
-        { label: "Q&A Period", seconds: parseMinutes(d.qa_period) },
+        {
+          label: "Q&A Period",
+          seconds: parseMinutes(d.qa_period),
+          phaseKind: "qa" as const,
+        },
       ].filter((p) => p.seconds > 0);
       if (phases.length === 0) return null;
       return {

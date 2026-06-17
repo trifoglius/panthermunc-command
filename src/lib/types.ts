@@ -104,6 +104,8 @@ export interface MotionSessionState {
   speakersFor?: string[];
   speakersAgainst?: string[];
   paperVotes?: PaperVoteRecord[];
+  presentationDelegates?: string[];
+  qaDelegates?: string[];
 }
 
 export interface PaperVoteRecord {
@@ -121,6 +123,8 @@ export interface MotionQueueSnapshot {
   motions: Motion[];
   speakerQueue?: string[];
   votingSpeakers?: { for: string[]; against: string[] };
+  presentationDelegates?: string[];
+  qaDelegates?: string[];
 }
 
 export interface Committee {

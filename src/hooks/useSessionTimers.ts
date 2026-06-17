@@ -50,7 +50,7 @@ export function useSessionTimers(
     if (mode === "none") return;
 
     intervalRef.current = setInterval(() => {
-      if (mode === "total" || mode === "speaking") {
+      if ((mode === "total" || mode === "speaking") && totalInitial > 0) {
         setTotalSeconds((t) => {
           const next = Math.max(0, t - 1);
           if (next === 0) {
@@ -73,7 +73,7 @@ export function useSessionTimers(
     }, 1000);
 
     return clear;
-  }, [mode, clear]);
+  }, [mode, clear, totalInitial]);
 
   return {
     totalSeconds,

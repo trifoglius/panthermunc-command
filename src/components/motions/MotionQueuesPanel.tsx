@@ -28,7 +28,8 @@ export function MotionQueuesPanel() {
         <p className="text-sm text-purple-700">
           Past motion queues are grouped below, newest first. Speaker lists are
           saved for formal speaking motions (speakers list, moderated caucus,
-          round robin, and 2-for-2-against).
+          round robin, and 2-for-2-against). Presentation and Q&amp;A delegate
+          selections are saved for draft resolution presentation motions.
         </p>
       </Card>
 
@@ -111,6 +112,32 @@ function SnapshotCard({
             )}
           </div>
         )}
+
+      {(snapshot.presentationDelegates?.length ?? 0) > 0 ||
+      (snapshot.qaDelegates?.length ?? 0) > 0 ? (
+        <div className="mb-4 grid gap-3 md:grid-cols-2">
+          {(snapshot.presentationDelegates?.length ?? 0) > 0 && (
+            <div className="rounded-md border border-purple-200 bg-purple-50 p-3">
+              <p className="mb-2 text-sm font-medium text-purple-900">
+                Presentation — Author Panel
+              </p>
+              <p className="text-sm text-purple-800">
+                {snapshot.presentationDelegates!.map(countryName).join(", ")}
+              </p>
+            </div>
+          )}
+          {(snapshot.qaDelegates?.length ?? 0) > 0 && (
+            <div className="rounded-md border border-purple-200 bg-purple-50 p-3">
+              <p className="mb-2 text-sm font-medium text-purple-900">
+                Q&amp;A — Author Panel
+              </p>
+              <p className="text-sm text-purple-800">
+                {snapshot.qaDelegates!.map(countryName).join(", ")}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {snapshot.speakerQueue && snapshot.speakerQueue.length > 0 && (
         <div className="mb-4 rounded-md border border-purple-200 bg-purple-50 p-3">

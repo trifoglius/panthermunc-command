@@ -323,6 +323,7 @@ export default function AdminUsersPage() {
 
                     <div className="mb-3 rounded-md border border-purple-100 bg-purple-50/50 p-3">
                       <PermissionEditor
+                        collapsible
                         role={role}
                         permissions={perms}
                         onRoleChange={(nextRole) =>

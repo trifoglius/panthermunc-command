@@ -88,6 +88,11 @@ interface ConferenceContextValue {
     speakersAgainst: string[]
   ) => void;
   setMotionPaperVotes: (motionId: string, paperVotes: PaperVoteRecord[]) => void;
+  setMotionPresentationDelegates: (
+    motionId: string,
+    presentationDelegates: string[],
+    qaDelegates: string[]
+  ) => void;
   archiveMotionQueue: (passedMotionId: string) => void;
   addDocument: (doc: Omit<Document, "id" | "amendments">) => void;
   updateDocument: (doc: Document) => void;
@@ -635,6 +640,25 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const setMotionPresentationDelegates = (
+    motionId: string,
+    presentationDelegates: string[],
+    qaDelegates: string[]
+  ) => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => ({
+      ...c,
+      motionSessionState: {
+        ...(c.motionSessionState ?? {}),
+        [motionId]: {
+          ...(c.motionSessionState?.[motionId] ?? {}),
+          presentationDelegates,
+          qaDelegates,
+        },
+      },
+    }));
+  };
+
   const archiveMotionQueue = (passedMotionId: string) => {
     const cid = requireCommittee();
     patchCommittee(cid, (c) => {
@@ -657,6 +681,12 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
               against: motionState?.speakersAgainst ?? [],
             }
           : undefined;
+      const isPresentDraft =
+        passedMotion && getMotionTypeId(passedMotion) === "present_draft";
+      const presentationDelegates = isPresentDraft
+        ? motionState?.presentationDelegates
+        : undefined;
+      const qaDelegates = isPresentDraft ? motionState?.qaDelegates : undefined;
 
       const snapshot: MotionQueueSnapshot = {
         id: uuidv4(),
@@ -673,6 +703,12 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
           (votingSpeakers.for.length > 0 || votingSpeakers.against.length > 0)
             ? votingSpeakers
             : undefined,
+        presentationDelegates:
+          presentationDelegates && presentationDelegates.length > 0
+            ? presentationDelegates
+            : undefined,
+        qaDelegates:
+          qaDelegates && qaDelegates.length > 0 ? qaDelegates : undefined,
       };
 
       const archivedIds = new Set(c.motions.map((m) => m.id));
@@ -854,6 +890,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         setMotionSpeakerQueue,
         setMotionVotingSpeakers,
         setMotionPaperVotes,
+        setMotionPresentationDelegates,
         archiveMotionQueue,
         addDocument,
         updateDocument,

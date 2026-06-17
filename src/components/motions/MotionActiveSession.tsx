@@ -2,6 +2,7 @@
 
 import { useSessionTimers } from "@/hooks/useSessionTimers";
 import { VotingPapersPanel } from "@/components/motions/VotingPapersPanel";
+import { PresentationSession } from "@/components/motions/PresentationSession";
 import { TimerDisplay } from "@/components/motions/TimerControls";
 import { SpeakerQueue } from "@/components/motions/SpeakerQueue";
 import { VotingSpeakerQueue } from "@/components/motions/VotingSpeakerQueue";
@@ -44,10 +45,15 @@ function MotionActiveSessionBody({
   motion: Motion;
   config: MotionTimerConfig;
 }) {
+  const isPresentDraft = getMotionTypeId(motion) === "present_draft";
   const timers = useSessionTimers(
     config.totalSeconds ?? 0,
     config.speakingSeconds ?? 0
   );
+
+  if (isPresentDraft && config.phases) {
+    return <PresentationSession motion={motion} config={config} />;
+  }
 
   return (
     <>
