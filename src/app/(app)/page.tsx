@@ -198,8 +198,10 @@ export default function Home() {
     syncError,
     clearSyncError,
   } = useConference();
+  // Only chairs and judges (users with an assigned committeeId) receive broadcast
+  // notifications. Admins and registrars send them but don't need to poll.
   const { notifications, dismiss, dismissAll } = useNotifications(
-    !authLoading && !loading && !!user
+    !authLoading && !loading && !!user?.committeeId
   );
 
   if (authLoading || loading) {

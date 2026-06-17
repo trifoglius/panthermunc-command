@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db, committees } from "@/db";
 import type { CommitteeData } from "@/db/schema";
-import { authErrorResponse, requireAdmin } from "@/lib/session";
+import { authErrorResponse, requireAdmin, requireSession } from "@/lib/session";
+import { parseJsonBody } from "@/lib/api/parse-json-body";
 import { canAccessAllCommittees } from "@/lib/permissions";
 import { DEFAULT_DELEGATES_GA } from "@/lib/constants";
 import { createEmptyRubricScore } from "@/lib/scoring";
@@ -13,16 +14,9 @@ import type { CommitteeType, Delegate } from "@/lib/types";
 export async function POST(request: Request) {
   try {
     const session = await requireAdmin();
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!body || typeof body !== "object") {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-    const payload = body as {
+    const parsed = await parseJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data as {
       name?: unknown;
       type?: unknown;
       withDefaults?: unknown;
@@ -92,8 +86,7 @@ export async function POST(request: Request) {
 // Returns summary list (same as in conference route, kept for convenience)
 export async function GET() {
   try {
-    const { requireSession } = await import("@/lib/session");
-    const session = await requireSession();
+    const session = await requireSession({ refresh: false });
 
     const rows = await db
       .select({

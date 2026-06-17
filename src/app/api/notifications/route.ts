@@ -1,12 +1,8 @@
 import { authErrorResponse, hasPermission, requirePermission, requireSession } from "@/lib/session";
+import { parseJsonBody } from "@/lib/api/parse-json-body";
+import type { NotificationItem } from "@/lib/types";
 
-export interface Notification {
-  id: string;
-  message: string;
-  committeeIds: string[] | null; // null = all committees
-  createdAt: string;
-  createdBy: string;
-}
+type Notification = NotificationItem;
 
 // In-process store (survives as long as the serverless instance lives;
 // good enough for a single-conference use case).
@@ -17,16 +13,9 @@ const store: Notification[] = [];
 export async function POST(request: Request) {
   try {
     const session = await requirePermission("notifications:send");
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!body || typeof body !== "object") {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-    const payload = body as { message?: unknown; committeeIds?: unknown };
+    const parsed = await parseJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data as { message?: unknown; committeeIds?: unknown };
 
     if (typeof payload.message !== "string" || !payload.message.trim()) {
       return Response.json({ error: "message is required" }, { status: 400 });
@@ -60,7 +49,7 @@ export async function POST(request: Request) {
 // Returns notifications relevant to the caller since the given timestamp.
 export async function GET(request: Request) {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ refresh: false });
     const { searchParams } = new URL(request.url);
     const since = searchParams.get("since");
 

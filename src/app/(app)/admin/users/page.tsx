@@ -1,14 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PermissionEditor } from "@/components/admin/PermissionEditor";
 import { Header } from "@/components/layout/Header";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 import {
-  hasPermission,
   permissionsForRole,
   ROLE_LABELS,
   type Permission,
@@ -47,7 +47,8 @@ function roleBadgeClass(role: UserRole) {
 
 export default function AdminUsersPage() {
   const router = useRouter();
-  const { user, authLoading } = useAuth();
+  const { user } = useAuth();
+  const { allowed, loading: authLoading } = useRequirePermission("users:manage");
   const { conference, loading: confLoading } = useConference();
 
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -73,12 +74,7 @@ export default function AdminUsersPage() {
   const [savingPermissions, setSavingPermissions] = useState<string | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user || !hasPermission(user, "users:manage")) router.replace("/");
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (!user || !hasPermission(user, "users:manage")) return;
+    if (!allowed) return;
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((data: UserRow[]) => {
@@ -99,7 +95,7 @@ export default function AdminUsersPage() {
         setEditPermissions(initPerms);
       })
       .finally(() => setLoadingUsers(false));
-  }, [user]);
+  }, [allowed]);
 
   const handleCreate = async () => {
     setCreateError("");
@@ -227,7 +223,7 @@ export default function AdminUsersPage() {
     );
   }
 
-  if (!user || !hasPermission(user, "users:manage")) return null;
+  if (!allowed) return null;
 
   return (
     <div className="min-h-screen bg-purple-50">
@@ -396,7 +392,7 @@ export default function AdminUsersPage() {
                           Reset PW
                         </Button>
                       </div>
-                      {u.id !== user.userId && (
+                      {u.id !== user?.userId && (
                         <Button
                           variant="danger"
                           size="sm"

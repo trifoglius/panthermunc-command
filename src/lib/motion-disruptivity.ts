@@ -51,16 +51,3 @@ export function computeMotionDisruptivity(
   }
 }
 
-export function computeMotionDisruptivityFromMotion(motion: {
-  motionTypeId?: string;
-  type: string;
-  details: Record<string, string>;
-}): number {
-  const motionTypeId =
-    motion.motionTypeId ??
-    MOTION_TYPES.find((m) => m.label === motion.type)?.id;
-  if (!motionTypeId) return 0;
-  const base =
-    MOTION_TYPES.find((m) => m.id === motionTypeId)?.disruptivity ?? 0;
-  return computeMotionDisruptivity(motionTypeId, base, motion.details);
-}

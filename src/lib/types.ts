@@ -149,7 +149,6 @@ export interface Conference {
   id: string;
   name: string;
   year: number;
-  managementPasswordHash?: string;
   committees: Committee[];
   createdAt: string;
   updatedAt: string;
@@ -173,4 +172,12 @@ export interface DelegateStats {
   positionPaperScore?: number;
   positionPaperStatus: PositionPaperStatus;
   specialCircumstance?: "discrepancy" | "tie" | "both";
+}
+
+export interface NotificationItem {
+  id: string;
+  message: string;
+  committeeIds: string[] | null;
+  createdAt: string;
+  createdBy: string;
 }

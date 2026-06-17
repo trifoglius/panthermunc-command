@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
-import { db, committees, users } from "@/db";
+import { db, users } from "@/db";
 import { authErrorResponse, requirePermission } from "@/lib/session";
 import {
   detectRoleFromPermissions,
@@ -8,15 +8,11 @@ import {
   type Permission,
   type UserRole,
 } from "@/lib/permissions";
-
-function isUserRole(value: unknown): value is UserRole {
-  return (
-    value === "admin" ||
-    value === "chair" ||
-    value === "registrar" ||
-    value === "custom"
-  );
-}
+import { parseJsonBody } from "@/lib/api/parse-json-body";
+import {
+  assertCommitteeInConference,
+  isUserRole,
+} from "@/lib/api/user-validation";
 
 // PATCH /api/admin/users/[id]
 export async function PATCH(
@@ -26,16 +22,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const session = await requirePermission("users:manage");
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!body || typeof body !== "object") {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-    const payload = body as {
+    const parsed = await parseJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data as {
       displayName?: unknown;
       committeeId?: unknown;
       password?: unknown;
@@ -63,19 +52,11 @@ export async function PATCH(
         return Response.json({ error: "Invalid committeeId" }, { status: 400 });
       }
       if (typeof payload.committeeId === "string") {
-        const [committee] = await db
-          .select({ id: committees.id })
-          .from(committees)
-          .where(
-            and(
-              eq(committees.id, payload.committeeId),
-              eq(committees.conferenceId, session.conferenceId)
-            )
-          )
-          .limit(1);
-        if (!committee) {
-          return Response.json({ error: "Committee not found" }, { status: 400 });
-        }
+        const err = await assertCommitteeInConference(
+          payload.committeeId,
+          session.conferenceId
+        );
+        if (err) return err;
       }
       updates.committeeId = payload.committeeId ?? null;
     }

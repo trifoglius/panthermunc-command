@@ -2,6 +2,7 @@ import { timingSafeEqual } from "crypto";
 import { hash } from "bcryptjs";
 import { db, conferences, users } from "@/db";
 import { ROLE_TEMPLATES } from "@/lib/permissions";
+import { parseJsonBody } from "@/lib/api/parse-json-body";
 
 function secureCompare(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -23,16 +24,9 @@ function secureCompare(a: string, b: string): boolean {
  * Body: { password: string } — must match BOOTSTRAP_ADMIN_PASSWORD
  */
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-  if (!body || typeof body !== "object") {
-    return Response.json({ error: "Invalid request body" }, { status: 400 });
-  }
-  const providedPassword = (body as { password?: unknown }).password;
+  const parsed = await parseJsonBody(request);
+  if (!parsed.ok) return parsed.response;
+  const providedPassword = parsed.data.password;
   if (typeof providedPassword !== "string" || !providedPassword) {
     return Response.json(
       { error: "Bootstrap admin password is required" },

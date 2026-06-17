@@ -1,16 +1,3 @@
-export const PANTHER_PURPLE = {
-  50: "#f5f0fa",
-  100: "#e8daef",
-  200: "#d2b4de",
-  300: "#bb8fce",
-  400: "#a569bd",
-  500: "#8e44ad",
-  600: "#7d3c98",
-  700: "#6c3483",
-  800: "#5b2c6f",
-  900: "#4a235a",
-};
-
 export const GA_RUBRIC = [
   { key: "research", label: "Preparation and Research", max: 5 },
   { key: "policy", label: "Policy Alignment", max: 5 },

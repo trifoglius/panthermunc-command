@@ -91,3 +91,5 @@ export function useSessionTimers(
     totalInitial,
   };
 }
+
+export type SessionTimers = ReturnType<typeof useSessionTimers>;

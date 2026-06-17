@@ -11,14 +11,15 @@ import { applyCommitteeDataUpdate } from "@/lib/committee-access";
 import { canOperateCommittee } from "@/lib/permissions";
 
 // GET /api/committees/[id]
-// Returns full committee data including JSONB payload
+// Returns full committee data including JSONB payload.
+// Accepts ?ifVersion=<n>: if the stored version equals n, responds with 304 (no body).
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    await requireCommitteeAccess(id);
+    await requireCommitteeAccess(id, { refresh: false });
 
     const [committee] = await db
       .select()
@@ -28,6 +29,11 @@ export async function GET(
 
     if (!committee) {
       return Response.json({ error: "Committee not found" }, { status: 404 });
+    }
+
+    const ifVersion = new URL(request.url).searchParams.get("ifVersion");
+    if (ifVersion !== null && committee.version === Number(ifVersion)) {
+      return new Response(null, { status: 304 });
     }
 
     return Response.json(committee);

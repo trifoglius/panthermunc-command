@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Badge, Button, Card, Input, Select } from "@/components/ui";
-import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
-import { hasPermission } from "@/lib/permissions";
+import { usePolling } from "@/hooks/usePolling";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { COMMITTEE_POLL_MS } from "@/lib/sync-constants";
 import { exportConferenceLogs } from "@/lib/conference-logs-export";
 import { getCommitteeStats } from "@/lib/conference-stats";
 import type { Committee } from "@/lib/types";
@@ -136,7 +137,7 @@ function NotifyChairsCard({ committees }: { committees: Committee[] }) {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, authLoading } = useAuth();
+  const { allowed, loading: authLoading } = useRequirePermission("conference:manage");
   const {
     conference,
     loading,
@@ -156,21 +157,7 @@ export default function SettingsPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user || !hasPermission(user, "conference:manage")) {
-      router.replace("/");
-    }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (loading || !conference) return;
-    void loadAllCommitteeData();
-    const interval = setInterval(() => {
-      void loadAllCommitteeData();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [loading, conference?.id, loadAllCommitteeData]);
+  usePolling(loadAllCommitteeData, COMMITTEE_POLL_MS, !loading && !!conference);
 
   if (authLoading || loading) {
     return (
@@ -180,7 +167,7 @@ export default function SettingsPage() {
     );
   }
 
-  if (!conference || !user || !hasPermission(user, "conference:manage")) return null;
+  if (!allowed || !conference) return null;
   const name = draftName ?? conference.name;
   const year = draftYear ?? conference.year;
 

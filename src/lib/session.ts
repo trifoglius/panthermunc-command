@@ -29,12 +29,33 @@ export async function getSession(): Promise<IronSession<SessionData>> {
   return getIronSession<SessionData>(cookieStore, SESSION_OPTIONS);
 }
 
-export async function requireSession(): Promise<SessionData> {
+/**
+ * Validate the session cookie and return session data.
+ *
+ * `refresh: false` — trust the encrypted cookie without a DB round-trip.
+ *   Use for read-only polling routes (GET committees, GET conference, GET notifications).
+ *
+ * `refresh: true` (default) — re-fetch user from DB, refresh cookie fields, and re-save.
+ *   Use for mutations and the /api/auth/me bootstrap call so that permission changes
+ *   take effect immediately on writes.
+ */
+export async function requireSession(
+  opts: { refresh?: boolean } = {}
+): Promise<SessionData> {
   const session = await getSession();
   if (!session.userId) {
     throw new AuthError("Not authenticated", 401);
   }
 
+  // Fast path: trust the encrypted, HMAC-signed cookie — no DB round-trip.
+  if (opts.refresh === false) {
+    if (!session.conferenceId) {
+      throw new AuthError("Not authenticated", 401);
+    }
+    return session as SessionData;
+  }
+
+  // Full path: re-validate against DB and refresh cookie.
   const [user] = await db
     .select()
     .from(users)
@@ -73,9 +94,10 @@ export async function requireAdmin(): Promise<SessionData> {
 }
 
 export async function requireCommitteeAccess(
-  committeeId: string
+  committeeId: string,
+  opts: { refresh?: boolean } = {}
 ): Promise<SessionData> {
-  const data = await requireSession();
+  const data = await requireSession(opts);
   if (hasPermission(data, "committee:access_all")) return data;
   if (data.committeeId === committeeId) return data;
   throw new AuthError("Access to this committee is not allowed", 403);

@@ -13,7 +13,15 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/context/AuthContext";
 import { computeRubricTotal, createEmptyRubricScore } from "@/lib/scoring";
-import { canAccessAllCommittees } from "@/lib/permissions";
+import {
+  committeeToData,
+  rowToCommittee,
+  emptyCommitteeStub,
+  COMMITTEE_DATA_KEYS,
+  type DbCommitteeRow,
+} from "@/lib/committee-mappers";
+import { COMMITTEE_POLL_MS } from "@/lib/sync-constants";
+import { usePolling } from "@/hooks/usePolling";
 import type {
   Committee,
   CommitteeType,
@@ -33,85 +41,6 @@ import type {
 } from "@/lib/types";
 import type { CommitteeData } from "@/db/schema";
 import { isFormalSpeakingMotion, getMotionTypeId, isAffirmative } from "@/lib/motion-timers";
-
-// ---------------------------------------------------------------------------
-// Data shape helpers
-// ---------------------------------------------------------------------------
-
-function committeeToData(c: Committee): CommitteeData {
-  return {
-    delegates: c.delegates,
-    rollCalls: c.rollCalls,
-    motions: c.motions,
-    motionQueueHistory: c.motionQueueHistory ?? [],
-    motionSessionState: c.motionSessionState ?? {},
-    documents: c.documents,
-    speakingEvents: c.speakingEvents,
-    points: c.points,
-    judgeScores: c.judgeScores,
-    daisScores: c.daisScores,
-    positionPaperScores: c.positionPaperScores,
-    vcRecipientId: c.vcRecipientId,
-    discrepancyThreshold: c.discrepancyThreshold,
-    requirePositionPapers: c.requirePositionPapers,
-  };
-}
-
-type DbCommitteeRow = {
-  id: string;
-  name: string;
-  type: string;
-  topic: string;
-  data: CommitteeData;
-  createdAt: string | Date;
-  version: number;
-};
-
-function rowToCommittee(row: DbCommitteeRow): Committee {
-  return {
-    id: row.id,
-    name: row.name,
-    type: row.type as CommitteeType,
-    topic: row.topic,
-    createdAt:
-      typeof row.createdAt === "string"
-        ? row.createdAt
-        : row.createdAt.toISOString(),
-    ...row.data,
-  };
-}
-
-function emptyCommitteeStub(row: {
-  id: string;
-  name: string;
-  type: string;
-  topic: string;
-  createdAt: string | Date;
-}): Committee {
-  return {
-    id: row.id,
-    name: row.name,
-    type: row.type as CommitteeType,
-    topic: row.topic,
-    createdAt:
-      typeof row.createdAt === "string"
-        ? row.createdAt
-        : (row.createdAt as Date).toISOString(),
-    delegates: [],
-    rollCalls: [],
-    motions: [],
-    motionQueueHistory: [],
-    motionSessionState: {},
-    documents: [],
-    speakingEvents: [],
-    points: [],
-    judgeScores: [],
-    daisScores: [],
-    positionPaperScores: [],
-    discrepancyThreshold: 10,
-    requirePositionPapers: false,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Context interface
@@ -205,6 +134,9 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   // Per-committee version tracking (incremented by server on each write)
   const versions = useRef<Map<string, number>>(new Map());
 
+  // Dirty-key tracking: which CommitteeData keys changed since last save
+  const dirtyKeys = useRef<Map<string, Set<keyof CommitteeData>>>(new Map());
+
   // Debounce timers for persisting committee data
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -212,9 +144,14 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   // Load committee full data
   // ---------------------------------------------------------------------------
 
-  const loadCommitteeData = useCallback(async (id: string) => {
+  const loadCommitteeData = useCallback(async (id: string, ifVersion?: number) => {
     try {
-      const r = await fetch(`/api/committees/${id}`);
+      const url =
+        ifVersion !== undefined
+          ? `/api/committees/${id}?ifVersion=${ifVersion}`
+          : `/api/committees/${id}`;
+      const r = await fetch(url);
+      if (r.status === 304) return; // version unchanged — no update needed
       if (!r.ok) return;
       const row: DbCommitteeRow = await r.json();
       versions.current.set(id, row.version);
@@ -233,9 +170,28 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Versions-first load: one lightweight request, then full fetch only for changed committees.
   const loadAllCommitteeData = useCallback(async () => {
-    const committees = conferenceRef.current?.committees ?? [];
-    await Promise.all(committees.map((c) => loadCommitteeData(c.id)));
+    const conf = conferenceRef.current;
+    if (!conf || conf.committees.length === 0) return;
+    try {
+      const r = await fetch("/api/conference/versions");
+      if (!r.ok) {
+        await Promise.all(conf.committees.map((c) => loadCommitteeData(c.id)));
+        return;
+      }
+      const { committees: serverVersions } = (await r.json()) as {
+        committees: Array<{ id: string; version: number }>;
+      };
+      const changed = serverVersions.filter(
+        (sv) => versions.current.get(sv.id) !== sv.version
+      );
+      if (changed.length > 0) {
+        await Promise.all(changed.map((sv) => loadCommitteeData(sv.id)));
+      }
+    } catch {
+      // non-fatal
+    }
   }, [loadCommitteeData]);
 
   // ---------------------------------------------------------------------------
@@ -261,7 +217,6 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         }
         setConferenceUnavailable(false);
         const data = await r.json();
-        // data = { id, name, year, createdAt, updatedAt, committees: [{id, name, type, topic, version, createdAt}] }
 
         const conf: Conference = {
           id: data.id,
@@ -278,16 +233,10 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         );
 
         // Auto-select and load the appropriate committee
-        if (
-          user.committeeId &&
-          !canAccessAllCommittees(user)
-        ) {
-          setActiveCommitteeId(user.committeeId);
-          await loadCommitteeData(user.committeeId);
-        } else if (data.committees.length > 0) {
-          const firstId = data.committees[0].id;
-          setActiveCommitteeId(firstId);
-          await loadCommitteeData(firstId);
+        const targetId = user.committeeId ?? data.committees[0]?.id ?? null;
+        if (targetId) {
+          setActiveCommitteeId(targetId);
+          await loadCommitteeData(targetId);
         }
       } finally {
         setLoading(false);
@@ -296,16 +245,21 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   }, [authLoading, user, loadCommitteeData]);
 
   // ---------------------------------------------------------------------------
-  // Poll committee data for users who can switch across committees
+  // Poll active committee data for all users assigned to a committee.
+  // Uses ifVersion so most polls are cheap 304 responses.
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!activeCommitteeId || !user || !canAccessAllCommittees(user)) return;
-    const interval = setInterval(() => {
-      loadCommitteeData(activeCommitteeId);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [activeCommitteeId, user, loadCommitteeData]);
+  const pollActiveCommittee = useCallback(() => {
+    if (!activeCommitteeId) return;
+    const knownVersion = versions.current.get(activeCommitteeId);
+    void loadCommitteeData(activeCommitteeId, knownVersion);
+  }, [activeCommitteeId, loadCommitteeData]);
+
+  usePolling(
+    pollActiveCommittee,
+    COMMITTEE_POLL_MS,
+    !loading && !!activeCommitteeId && !!user
+  );
 
   // ---------------------------------------------------------------------------
   // Active committee memo
@@ -318,7 +272,8 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   );
 
   // ---------------------------------------------------------------------------
-  // Persist committee data to API (debounced, 300ms)
+  // Persist committee data to API (debounced, 1s)
+  // Uses dirty-key tracking to send only changed CommitteeData fields.
   // ---------------------------------------------------------------------------
 
   const syncCommittee = useCallback(
@@ -327,11 +282,24 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       const committee = conf?.committees.find((c) => c.id === committeeId);
       if (!committee) return;
 
+      // Snapshot and clear dirty keys before the async PATCH
+      const dirty = dirtyKeys.current.get(committeeId) ?? new Set<keyof CommitteeData>();
+      dirtyKeys.current.set(committeeId, new Set());
+
+      const fullData = committeeToData(committee);
+      const partialData: Partial<CommitteeData> = {};
+      for (const k of dirty) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (partialData as any)[k] = (fullData as any)[k];
+      }
+      // Fallback: send full data if dirty tracking is empty (e.g., updateCommittee)
+      const dataPayload = dirty.size > 0 ? partialData : fullData;
+
       const version = versions.current.get(committeeId) ?? 0;
       fetch(`/api/committees/${committeeId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version, data: committeeToData(committee) }),
+        body: JSON.stringify({ version, data: dataPayload }),
       })
         .then(async (r) => {
           if (r.ok) {
@@ -363,24 +331,39 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
       const timer = setTimeout(() => {
         saveTimers.current.delete(committeeId);
         syncCommittee(committeeId);
-      }, 300);
+      }, 1000);
       saveTimers.current.set(committeeId, timer);
     },
     [syncCommittee]
   );
 
   // ---------------------------------------------------------------------------
-  // Core patch helper (applies locally + schedules save)
+  // Core patch helper (applies locally + tracks dirty keys + schedules save)
   // ---------------------------------------------------------------------------
 
   const patchCommittee = useCallback(
     (committeeId: string, updater: (c: Committee) => Committee) => {
       setConference((prev) => {
         if (!prev) return prev;
+        const oldC = prev.committees.find((c) => c.id === committeeId);
+        const newC = oldC ? updater(oldC) : null;
+        if (!newC || !oldC) return prev;
+
+        // Detect which CommitteeData keys changed (shallow reference equality)
+        const existing =
+          dirtyKeys.current.get(committeeId) ?? new Set<keyof CommitteeData>();
+        for (const k of COMMITTEE_DATA_KEYS) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((oldC as any)[k] !== (newC as any)[k]) {
+            existing.add(k);
+          }
+        }
+        dirtyKeys.current.set(committeeId, existing);
+
         const updated = {
           ...prev,
           committees: prev.committees.map((c) =>
-            c.id === committeeId ? updater(c) : c
+            c.id === committeeId ? newC : c
           ),
         };
         conferenceRef.current = updated;
@@ -401,22 +384,11 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   // ---------------------------------------------------------------------------
 
   const initConference = async (name: string, year: number) => {
-    // First try to update an existing conference
-    const payload = { name, year };
-    let r = await fetch("/api/conference", {
+    const r = await fetch("/api/conference", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ name, year }),
     });
-
-    // If no conference exists yet (e.g. after deletion), fall back to create
-    if (!r.ok) {
-      r = await fetch("/api/conference", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    }
 
     if (!r.ok) {
       setSyncError("Failed to initialize conference. Please try again.");
@@ -473,15 +445,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
   const selectCommittee = async (id: string | null) => {
     setActiveCommitteeId(id);
     if (id) {
-      const already = conferenceRef.current?.committees.find((c) => c.id === id);
-      // Only fetch if we haven't loaded real data yet (delegates array is empty)
-      if (already && already.delegates.length === 0 && !versions.current.has(id)) {
-        await loadCommitteeData(id);
-      } else if (id && !already) {
-        await loadCommitteeData(id);
-      } else {
-        await loadCommitteeData(id); // always refresh on switch
-      }
+      await loadCommitteeData(id);
     }
   };
 

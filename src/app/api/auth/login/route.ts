@@ -3,19 +3,13 @@ import { eq } from "drizzle-orm";
 import { db, users } from "@/db";
 import { authErrorResponse, getSession } from "@/lib/session";
 import { normalizePermissions, type UserRole } from "@/lib/permissions";
+import { parseJsonBody } from "@/lib/api/parse-json-body";
 
 export async function POST(request: Request) {
   try {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!body || typeof body !== "object") {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-    const { username, password } = body as {
+    const parsed = await parseJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const { username, password } = parsed.data as {
       username?: unknown;
       password?: unknown;
     };

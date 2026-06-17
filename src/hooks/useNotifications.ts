@@ -1,16 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { usePolling } from "@/hooks/usePolling";
+import { NOTIFICATION_POLL_MS } from "@/lib/sync-constants";
+import type { NotificationItem } from "@/lib/types";
 
-export interface NotificationItem {
-  id: string;
-  message: string;
-  committeeIds: string[] | null;
-  createdAt: string;
-  createdBy: string;
-}
-
-const POLL_INTERVAL = 10_000; // 10 seconds
+export type { NotificationItem };
 
 export function useNotifications(enabled: boolean) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -43,12 +38,7 @@ export function useNotifications(enabled: boolean) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!enabled) return;
-    poll();
-    const interval = setInterval(poll, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [enabled, poll]);
+  usePolling(poll, NOTIFICATION_POLL_MS, enabled);
 
   const dismiss = useCallback((id: string) => {
     setDismissed((prev) => new Set([...prev, id]));

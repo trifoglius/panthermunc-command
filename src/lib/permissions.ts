@@ -106,15 +106,6 @@ export function canOperateCommittee(
   return session.committeeId === committeeId;
 }
 
-export function canEditScoring(
-  session: { permissions: Permission[]; committeeId: string | null },
-  committeeId: string
-): boolean {
-  if (!hasPermission(session, "scoring:edit")) return false;
-  if (hasPermission(session, "committee:access_all")) return true;
-  return session.committeeId === committeeId;
-}
-
 /** Scoring-related fields a registrar may update without full committee operate access. */
 export const SCORING_DATA_KEYS = [
   "judgeScores",

@@ -110,8 +110,8 @@ export const users = pgTable(
 export type Conference = typeof conferences.$inferSelect;
 export type NewConference = typeof conferences.$inferInsert;
 
-export type Committee = typeof committees.$inferSelect;
-export type NewCommittee = typeof committees.$inferInsert;
+export type CommitteeRow = typeof committees.$inferSelect;
+export type NewCommitteeRow = typeof committees.$inferInsert;
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

@@ -1,33 +1,17 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
-import { db, committees, users } from "@/db";
+import { db, users } from "@/db";
 import { authErrorResponse, requirePermission } from "@/lib/session";
 import {
   detectRoleFromPermissions,
   normalizePermissions,
-  permissionsForRole,
-  type Permission,
-  type UserRole,
 } from "@/lib/permissions";
-
-function parsePermissions(
-  role: UserRole,
-  raw?: unknown
-): Permission[] {
-  if (Array.isArray(raw)) {
-    return normalizePermissions(raw.filter((p) => typeof p === "string"));
-  }
-  return permissionsForRole(role);
-}
-
-function isUserRole(value: unknown): value is UserRole {
-  return (
-    value === "admin" ||
-    value === "chair" ||
-    value === "registrar" ||
-    value === "custom"
-  );
-}
+import { parseJsonBody } from "@/lib/api/parse-json-body";
+import {
+  assertCommitteeInConference,
+  isUserRole,
+  parsePermissions,
+} from "@/lib/api/user-validation";
 
 // GET /api/admin/users
 export async function GET() {
@@ -62,16 +46,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await requirePermission("users:manage");
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!body || typeof body !== "object") {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-    const payload = body as {
+    const parsed = await parseJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data as {
       username?: unknown;
       password?: unknown;
       role?: unknown;
@@ -122,19 +99,11 @@ export async function POST(request: Request) {
       if (typeof payload.committeeId !== "string") {
         return Response.json({ error: "Invalid committeeId" }, { status: 400 });
       }
-      const [committee] = await db
-        .select({ id: committees.id })
-        .from(committees)
-        .where(
-          and(
-            eq(committees.id, payload.committeeId),
-            eq(committees.conferenceId, session.conferenceId)
-          )
-        )
-        .limit(1);
-      if (!committee) {
-        return Response.json({ error: "Committee not found" }, { status: 400 });
-      }
+      const err = await assertCommitteeInConference(
+        payload.committeeId,
+        session.conferenceId
+      );
+      if (err) return err;
     }
 
     const storedRole =

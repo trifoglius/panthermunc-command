@@ -6,12 +6,13 @@ import {
   requireSession,
 } from "@/lib/session";
 import { canAccessAllCommittees } from "@/lib/permissions";
+import { parseJsonBody } from "@/lib/api/parse-json-body";
 
 // GET /api/conference
 // Returns conference metadata + committee list (scoped to role)
 export async function GET() {
   try {
-    const session = await requireSession();
+    const session = await requireSession({ refresh: false });
 
     const [conference] = await db
       .select()
@@ -51,16 +52,9 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const session = await requireAdmin();
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    if (!body || typeof body !== "object") {
-      return Response.json({ error: "Invalid request body" }, { status: 400 });
-    }
-    const payload = body as { name?: unknown; year?: unknown };
+    const parsed = await parseJsonBody(request);
+    if (!parsed.ok) return parsed.response;
+    const payload = parsed.data as { name?: unknown; year?: unknown };
 
     const updates: { name?: string; year?: number; updatedAt: Date } = {
       updatedAt: new Date(),
