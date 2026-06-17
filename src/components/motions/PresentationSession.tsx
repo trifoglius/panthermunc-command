@@ -31,28 +31,28 @@ function LoggedPhaseTimer({
   onLog: (delegateIds: string[], eventType: string, durationSeconds: number) => void;
 }) {
   const { seconds, running, start, pause, reset } = useCountdown(initialSeconds);
-  const loggedRef = useRef(false);
+  const [isLogged, setIsLogged] = useState(false);
   const hasRunRef = useRef(false);
 
   const logPeriod = useCallback(() => {
-    if (loggedRef.current || selectedDelegateIds.length === 0) return;
+    if (isLogged || selectedDelegateIds.length === 0) return;
     const elapsed = initialSeconds - seconds;
     if (elapsed <= 0) return;
-    loggedRef.current = true;
+    setIsLogged(true);
     pause();
     onLog(selectedDelegateIds, eventType, elapsed);
-  }, [eventType, initialSeconds, onLog, pause, seconds, selectedDelegateIds]);
+  }, [eventType, initialSeconds, isLogged, onLog, pause, seconds, selectedDelegateIds]);
 
   useEffect(() => {
     if (
       seconds === 0 &&
       initialSeconds > 0 &&
-      !loggedRef.current &&
+      !isLogged &&
       hasRunRef.current
     ) {
       logPeriod();
     }
-  }, [seconds, initialSeconds, logPeriod]);
+  }, [seconds, initialSeconds, isLogged, logPeriod]);
 
   const handleStart = () => {
     hasRunRef.current = true;
@@ -60,7 +60,7 @@ function LoggedPhaseTimer({
   };
 
   const handleReset = () => {
-    loggedRef.current = false;
+    setIsLogged(false);
     hasRunRef.current = false;
     reset(initialSeconds);
   };
@@ -88,11 +88,11 @@ function LoggedPhaseTimer({
         <Button
           size="sm"
           onClick={logPeriod}
-          disabled={needsDelegates || loggedRef.current || initialSeconds - seconds <= 0}
+          disabled={needsDelegates || isLogged || initialSeconds - seconds <= 0}
         >
           Complete &amp; Log {phaseKind === "presentation" ? "Presentation" : "Q&A"}
         </Button>
-        {loggedRef.current && (
+        {isLogged && (
           <span className="self-center text-sm text-green-700">
             Logged {formatTime(initialSeconds - seconds)} for{" "}
             {selectedDelegateIds.length} delegate(s)

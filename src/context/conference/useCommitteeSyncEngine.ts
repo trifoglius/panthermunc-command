@@ -21,7 +21,9 @@ export function useCommitteeSyncEngine(
 ): CommitteeSyncEngine {
   const [conference, setConference] = useState<Conference | null>(null);
   const [activeCommitteeId, setActiveCommitteeId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedForUserId, setLoadedForUserId] = useState<string | null>(null);
+  const loading =
+    authLoading || (!!user && loadedForUserId !== user.userId);
   const [conferenceUnavailable, setConferenceUnavailable] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -84,11 +86,9 @@ export function useCommitteeSyncEngine(
   }, [loadCommitteeData]);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (authLoading || !user || loadedForUserId === user.userId) return;
+
+    let cancelled = false;
 
     (async () => {
       try {
@@ -97,7 +97,6 @@ export function useCommitteeSyncEngine(
           if (r.status === 404) {
             setConferenceUnavailable(true);
           }
-          setLoading(false);
           return;
         }
         setConferenceUnavailable(false);
@@ -123,10 +122,14 @@ export function useCommitteeSyncEngine(
           await loadCommitteeData(targetId);
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoadedForUserId(user.userId);
       }
     })();
-  }, [authLoading, user, loadCommitteeData]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, loadedForUserId, loadCommitteeData]);
 
   const pollActiveCommittee = useCallback(() => {
     if (!activeCommitteeId) return;
