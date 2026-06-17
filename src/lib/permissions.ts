@@ -106,6 +106,16 @@ export function canOperateCommittee(
   return session.committeeId === committeeId;
 }
 
+export function canEditCommitteeMetadata(
+  session: { permissions: Permission[]; committeeId: string | null },
+  committeeId: string
+): boolean {
+  return (
+    hasPermission(session, "conference:manage") ||
+    canOperateCommittee(session, committeeId)
+  );
+}
+
 /** Scoring-related fields a registrar may update without full committee operate access. */
 export const SCORING_DATA_KEYS = [
   "judgeScores",

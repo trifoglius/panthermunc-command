@@ -10,7 +10,43 @@ import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { COMMITTEE_POLL_MS } from "@/lib/sync-constants";
 import { exportConferenceLogs } from "@/lib/conference-logs-export";
 import { getCommitteeStats } from "@/lib/conference-stats";
-import type { Committee } from "@/lib/types";
+import type { Committee, CommitteeType } from "@/lib/types";
+
+const COMMITTEE_TYPE_OPTIONS = [
+  { value: "ga", label: "General Assembly (GA Rubric)" },
+  { value: "crisis", label: "Crisis (Crisis Rubric)" },
+  { value: "specialized", label: "Specialized (GA Rubric)" },
+] as const;
+
+type CommitteeDraft = {
+  name: string;
+  topic: string;
+  type: CommitteeType;
+};
+
+function getCommitteeDraft(
+  committee: Committee,
+  drafts: Record<string, CommitteeDraft>
+): CommitteeDraft {
+  return (
+    drafts[committee.id] ?? {
+      name: committee.name,
+      topic: committee.topic,
+      type: committee.type,
+    }
+  );
+}
+
+function committeeDraftChanged(
+  committee: Committee,
+  draft: CommitteeDraft
+): boolean {
+  return (
+    draft.name.trim() !== committee.name ||
+    draft.topic.trim() !== committee.topic ||
+    draft.type !== committee.type
+  );
+}
 
 function ConferenceStatsCard({ committees }: { committees: Committee[] }) {
   if (committees.length === 0) return null;
@@ -142,7 +178,7 @@ export default function SettingsPage() {
     conference,
     loading,
     updateConference,
-    updateCommittee,
+    updateCommitteeSettings,
     removeCommittee,
     deleteConference,
     loadAllCommitteeData,
@@ -150,9 +186,10 @@ export default function SettingsPage() {
 
   const [draftName, setDraftName] = useState<string | null>(null);
   const [draftYear, setDraftYear] = useState<number | null>(null);
-  const [committeeNames, setCommitteeNames] = useState<Record<string, string>>(
-    {}
-  );
+  const [committeeDrafts, setCommitteeDrafts] = useState<
+    Record<string, CommitteeDraft>
+  >({});
+  const [savingCommitteeId, setSavingCommitteeId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [showDelete, setShowDelete] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -179,11 +216,50 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
-  const handleSaveCommitteeName = (id: string) => {
+  const handleSaveCommittee = async (id: string) => {
     const committee = conference.committees.find((c) => c.id === id);
-    const newName = committeeNames[id]?.trim();
-    if (!committee || !newName || newName === committee.name) return;
-    updateCommittee({ ...committee, name: newName });
+    if (!committee) return;
+
+    const draft = getCommitteeDraft(committee, committeeDrafts);
+    const trimmedName = draft.name.trim();
+    if (!trimmedName) return;
+    if (!committeeDraftChanged(committee, { ...draft, name: trimmedName })) return;
+
+    if (
+      draft.type !== committee.type &&
+      !confirm(
+        "Changing committee type resets rubric scores to match the new scoring model. Notes are kept. Continue?"
+      )
+    ) {
+      return;
+    }
+
+    setSavingCommitteeId(id);
+    try {
+      await updateCommitteeSettings(id, {
+        name: trimmedName,
+        topic: draft.topic.trim(),
+        type: draft.type,
+      });
+      setCommitteeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    } finally {
+      setSavingCommitteeId(null);
+    }
+  };
+
+  const updateCommitteeDraft = (
+    id: string,
+    committee: Committee,
+    patch: Partial<CommitteeDraft>
+  ) => {
+    setCommitteeDrafts((prev) => ({
+      ...prev,
+      [id]: { ...getCommitteeDraft(committee, prev), ...patch },
+    }));
   };
 
   const handleRemoveCommittee = async (id: string) => {
@@ -252,40 +328,70 @@ export default function SettingsPage() {
               {conference.committees.length === 0 ? (
                 <p className="text-sm text-purple-600">No committees.</p>
               ) : (
-                <ul className="space-y-3">
-                  {conference.committees.map((c) => (
-                    <li
-                      key={c.id}
-                      className="flex flex-wrap items-end gap-2 border-b border-purple-100 pb-3 last:border-0"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <Input
-                          label={c.type.toUpperCase()}
-                          value={committeeNames[c.id] ?? c.name}
-                          onChange={(e) =>
-                            setCommitteeNames((prev) => ({
-                              ...prev,
-                              [c.id]: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleSaveCommitteeName(c.id)}
+                <ul className="space-y-4">
+                  {conference.committees.map((c) => {
+                    const draft = getCommitteeDraft(c, committeeDrafts);
+                    const hasChanges = committeeDraftChanged(c, draft);
+                    return (
+                      <li
+                        key={c.id}
+                        className="space-y-3 border-b border-purple-100 pb-4 last:border-0"
                       >
-                        Save
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleRemoveCommittee(c.id)}
-                      >
-                        Remove
-                      </Button>
-                    </li>
-                  ))}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Input
+                            label="Committee Name"
+                            value={draft.name}
+                            onChange={(e) =>
+                              updateCommitteeDraft(c.id, c, { name: e.target.value })
+                            }
+                          />
+                          <Select
+                            label="Committee Type"
+                            value={draft.type}
+                            onChange={(e) =>
+                              updateCommitteeDraft(c.id, c, {
+                                type: e.target.value as CommitteeType,
+                              })
+                            }
+                            options={[...COMMITTEE_TYPE_OPTIONS]}
+                          />
+                          <div className="sm:col-span-2">
+                            <Input
+                              label="Topic"
+                              value={draft.topic}
+                              onChange={(e) =>
+                                updateCommitteeDraft(c.id, c, {
+                                  topic: e.target.value,
+                                })
+                              }
+                              placeholder="Committee topic"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={
+                              !hasChanges ||
+                              !draft.name.trim() ||
+                              savingCommitteeId === c.id
+                            }
+                            onClick={() => handleSaveCommittee(c.id)}
+                          >
+                            {savingCommitteeId === c.id ? "Saving..." : "Save"}
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleRemoveCommittee(c.id)}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </Card>

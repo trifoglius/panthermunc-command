@@ -8,7 +8,8 @@ import {
   requireCommitteeAccess,
 } from "@/lib/session";
 import { applyCommitteeDataUpdate } from "@/lib/committee-access";
-import { canOperateCommittee } from "@/lib/permissions";
+import { canEditCommitteeMetadata } from "@/lib/permissions";
+import type { CommitteeType } from "@/lib/types";
 
 // GET /api/committees/[id]
 // Returns full committee data including JSONB payload.
@@ -44,7 +45,7 @@ export async function GET(
 
 // PATCH /api/committees/[id]
 // Update committee data with optimistic concurrency via version field.
-// Body: { version: number, data?: Partial<CommitteeData>, name?: string, topic?: string }
+// Body: { version: number, data?: Partial<CommitteeData>, name?: string, topic?: string, type?: CommitteeType }
 // Returns 409 if the client's version is stale.
 export async function PATCH(
   request: Request,
@@ -85,6 +86,7 @@ export async function PATCH(
       data?: CommitteeData;
       name?: string;
       topic?: string;
+      type?: CommitteeType;
     } = {
       version: current.version + 1,
       updatedAt: new Date(),
@@ -103,16 +105,26 @@ export async function PATCH(
       }
     }
     if (typeof body.name === "string" && body.name.trim()) {
-      if (!canOperateCommittee(session, id)) {
+      if (!canEditCommitteeMetadata(session, id)) {
         throw new AuthError("Not authorized to rename committee", 403);
       }
       updates.name = body.name.trim();
     }
     if (typeof body.topic === "string") {
-      if (!canOperateCommittee(session, id)) {
+      if (!canEditCommitteeMetadata(session, id)) {
         throw new AuthError("Not authorized to edit committee topic", 403);
       }
       updates.topic = body.topic.trim();
+    }
+    if (typeof body.type === "string") {
+      const validTypes: CommitteeType[] = ["ga", "crisis", "specialized"];
+      if (!validTypes.includes(body.type as CommitteeType)) {
+        return Response.json({ error: "Invalid committee type" }, { status: 400 });
+      }
+      if (!canEditCommitteeMetadata(session, id)) {
+        throw new AuthError("Not authorized to edit committee type", 403);
+      }
+      updates.type = body.type as CommitteeType;
     }
 
     const [updated] = await db

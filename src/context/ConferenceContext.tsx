@@ -41,6 +41,7 @@ import type {
 } from "@/lib/types";
 import type { CommitteeData } from "@/db/schema";
 import { isFormalSpeakingMotion, getMotionTypeId, isAffirmative } from "@/lib/motion-timers";
+import { applyCommitteeTypeChange } from "@/lib/committee-settings";
 
 // ---------------------------------------------------------------------------
 // Context interface
@@ -66,6 +67,10 @@ interface ConferenceContextValue {
   selectCommittee: (id: string | null) => Promise<void>;
   loadAllCommitteeData: () => Promise<void>;
   updateCommittee: (committee: Committee) => void;
+  updateCommitteeSettings: (
+    committeeId: string,
+    updates: { name?: string; topic?: string; type?: CommitteeType }
+  ) => Promise<void>;
   addDelegate: (
     country: string,
     delegateName: string,
@@ -456,6 +461,85 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
 
   const updateCommittee = (committee: Committee) => {
     patchCommittee(committee.id, () => committee);
+  };
+
+  const updateCommitteeSettings = async (
+    committeeId: string,
+    updates: { name?: string; topic?: string; type?: CommitteeType }
+  ) => {
+    const committee = conferenceRef.current?.committees.find(
+      (c) => c.id === committeeId
+    );
+    if (!committee) return;
+
+    let next = { ...committee };
+    if (updates.name !== undefined) {
+      const trimmed = updates.name.trim();
+      if (!trimmed) return;
+      next = { ...next, name: trimmed };
+    }
+    if (updates.topic !== undefined) {
+      next = { ...next, topic: updates.topic.trim() };
+    }
+
+    const typeChanged =
+      updates.type !== undefined && updates.type !== committee.type;
+    if (updates.type !== undefined) {
+      next = applyCommitteeTypeChange(next, updates.type);
+    }
+
+    const version = versions.current.get(committeeId) ?? 0;
+    const body: {
+      version: number;
+      name?: string;
+      topic?: string;
+      type?: CommitteeType;
+      data?: ReturnType<typeof committeeToData>;
+    } = { version };
+
+    if (updates.name !== undefined) body.name = next.name;
+    if (updates.topic !== undefined) body.topic = next.topic;
+    if (updates.type !== undefined) body.type = next.type;
+    if (typeChanged) body.data = committeeToData(next);
+
+    try {
+      const r = await fetch(`/api/committees/${committeeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (r.ok) {
+        const row: DbCommitteeRow = await r.json();
+        versions.current.set(committeeId, row.version);
+        const updated = rowToCommittee(row);
+        setConference((prev) => {
+          if (!prev) return prev;
+          const updatedConf = {
+            ...prev,
+            committees: prev.committees.map((c) =>
+              c.id === committeeId ? updated : c
+            ),
+          };
+          conferenceRef.current = updatedConf;
+          return updatedConf;
+        });
+      } else if (r.status === 409) {
+        const conflict = await r.json();
+        versions.current.set(
+          committeeId,
+          conflict.latest?.version ?? versions.current.get(committeeId) ?? 0
+        );
+        await loadCommitteeData(committeeId);
+        setSyncError(
+          "Another change was detected — your view has been refreshed."
+        );
+      } else {
+        setSyncError("Failed to save committee settings.");
+      }
+    } catch {
+      setSyncError("Failed to save committee settings — check your connection.");
+    }
   };
 
   const removeCommittee = async (id: string) => {
@@ -880,6 +964,7 @@ export function ConferenceProvider({ children }: { children: ReactNode }) {
         selectCommittee,
         loadAllCommitteeData,
         updateCommittee,
+        updateCommitteeSettings,
         addDelegate,
         updateDelegate,
         removeDelegate,
