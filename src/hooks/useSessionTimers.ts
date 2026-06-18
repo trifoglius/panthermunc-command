@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { playAlarmSound } from "@/lib/alarm-sound";
 
 export type TimerMode = "none" | "total" | "speaking";
 
@@ -50,9 +51,12 @@ export function useSessionTimers(
     if (mode === "none") return;
 
     intervalRef.current = setInterval(() => {
+      let expired = false;
+
       if ((mode === "total" || mode === "speaking") && totalInitial > 0) {
         setTotalSeconds((t) => {
           const next = Math.max(0, t - 1);
+          if (next === 0 && t > 0) expired = true;
           if (next === 0) {
             clear();
             setMode("none");
@@ -63,6 +67,7 @@ export function useSessionTimers(
       if (mode === "speaking") {
         setSpeakingSeconds((s) => {
           const next = Math.max(0, s - 1);
+          if (next === 0 && s > 0) expired = true;
           if (next === 0) {
             clear();
             setMode("none");
@@ -70,6 +75,8 @@ export function useSessionTimers(
           return next;
         });
       }
+
+      if (expired) playAlarmSound();
     }, 1000);
 
     return clear;
