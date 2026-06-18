@@ -13,6 +13,11 @@ export function useSessionTimers(
   const [speakingSeconds, setSpeakingSeconds] = useState(speakingInitial);
   const [mode, setMode] = useState<TimerMode>("none");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const totalRef = useRef(totalSeconds);
+  const speakingRef = useRef(speakingSeconds);
+
+  totalRef.current = totalSeconds;
+  speakingRef.current = speakingSeconds;
 
   const clear = useCallback(() => {
     if (intervalRef.current) {
@@ -28,6 +33,7 @@ export function useSessionTimers(
 
   const resetTotal = useCallback(
     (value = totalInitial) => {
+      totalRef.current = value;
       setTotalSeconds(value);
     },
     [totalInitial]
@@ -35,6 +41,7 @@ export function useSessionTimers(
 
   const resetSpeaking = useCallback(
     (value = speakingInitial) => {
+      speakingRef.current = value;
       setSpeakingSeconds(value);
     },
     [speakingInitial]
@@ -64,29 +71,32 @@ export function useSessionTimers(
       let expired = false;
 
       if ((mode === "total" || mode === "speaking") && totalInitial > 0) {
-        setTotalSeconds((t) => {
-          const next = Math.max(0, t - 1);
-          if (next === 0 && t > 0) expired = true;
-          if (next === 0) {
-            clear();
-            setMode("none");
-          }
-          return next;
-        });
-      }
-      if (mode === "speaking") {
-        setSpeakingSeconds((s) => {
-          const next = Math.max(0, s - 1);
-          if (next === 0 && s > 0) expired = true;
-          if (next === 0) {
-            clear();
-            setMode("none");
-          }
-          return next;
-        });
+        const current = totalRef.current;
+        const next = Math.max(0, current - 1);
+        if (next === 0 && current > 0) expired = true;
+        totalRef.current = next;
+        setTotalSeconds(next);
+        if (next === 0) {
+          clear();
+          setMode("none");
+        }
       }
 
-      if (expired) playAlarmSound();
+      if (mode === "speaking") {
+        const current = speakingRef.current;
+        const next = Math.max(0, current - 1);
+        if (next === 0 && current > 0) expired = true;
+        speakingRef.current = next;
+        setSpeakingSeconds(next);
+        if (next === 0) {
+          clear();
+          setMode("none");
+        }
+      }
+
+      if (expired) {
+        playAlarmSound();
+      }
     }, 1000);
 
     return clear;

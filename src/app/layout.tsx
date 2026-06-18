@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AlarmAudioProvider } from "@/components/AlarmAudioProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
@@ -16,7 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col font-sans">
-        <AuthProvider>{children}</AuthProvider>
+        <AlarmAudioProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </AlarmAudioProvider>
       </body>
     </html>
   );

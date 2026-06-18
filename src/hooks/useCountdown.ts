@@ -7,6 +7,9 @@ export function useCountdown(initialSeconds: number) {
   const [seconds, setSeconds] = useState(initialSeconds);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const secondsRef = useRef(seconds);
+
+  secondsRef.current = seconds;
 
   const clear = useCallback(() => {
     if (intervalRef.current) {
@@ -18,6 +21,7 @@ export function useCountdown(initialSeconds: number) {
   const reset = useCallback(
     (value: number) => {
       clear();
+      secondsRef.current = value;
       setSeconds(value);
       setRunning(false);
     },
@@ -35,17 +39,25 @@ export function useCountdown(initialSeconds: number) {
       clear();
       return;
     }
+
     intervalRef.current = setInterval(() => {
-      setSeconds((s) => {
-        if (s <= 1) {
-          clear();
-          setRunning(false);
-          if (s > 0) playAlarmSound();
-          return 0;
+      const current = secondsRef.current;
+      if (current <= 1) {
+        clear();
+        setRunning(false);
+        secondsRef.current = 0;
+        setSeconds(0);
+        if (current > 0) {
+          playAlarmSound();
         }
-        return s - 1;
-      });
+        return;
+      }
+
+      const next = current - 1;
+      secondsRef.current = next;
+      setSeconds(next);
     }, 1000);
+
     return clear;
   }, [running, clear]);
 

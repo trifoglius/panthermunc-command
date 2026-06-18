@@ -1,85 +1,44 @@
-const ALARM_URL = "/alarm_sound.wav";
+const ALARM_SOUND_URL = "/alarm_sound.wav";
 
-let audioContext: AudioContext | null = null;
-let alarmBuffer: AudioBuffer | null = null;
-let bufferPromise: Promise<AudioBuffer> | null = null;
+let alarmAudio: HTMLAudioElement | null = null;
+let unlocked = false;
 
-function getAudioContext() {
+export function setAlarmAudioElement(element: HTMLAudioElement | null) {
+  alarmAudio = element;
+  unlocked = false;
+}
+
+function getAlarmAudio() {
+  if (alarmAudio) return alarmAudio;
   if (typeof window === "undefined") return null;
-
-  if (!audioContext) {
-    const AudioContextCtor =
-      window.AudioContext ||
-      (window as Window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioContextCtor) return null;
-    audioContext = new AudioContextCtor();
-  }
-
-  return audioContext;
+  return new Audio(ALARM_SOUND_URL);
 }
 
-function loadAlarmBuffer() {
-  if (bufferPromise) return bufferPromise;
-
-  bufferPromise = (async () => {
-    const ctx = getAudioContext();
-    if (!ctx) throw new Error("AudioContext unavailable");
-
-    const response = await fetch(ALARM_URL);
-    if (!response.ok) throw new Error("Failed to load alarm sound");
-
-    const data = await response.arrayBuffer();
-    return ctx.decodeAudioData(data);
-  })();
-
-  return bufferPromise;
-}
-
-/** Call from a user gesture (e.g. Start) so playback works when the timer expires. */
+/** Call during a user gesture so playback works when the timer expires. */
 export function unlockAlarmSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
+  const audio = getAlarmAudio();
+  if (!audio || unlocked) return;
 
-  if (ctx.state === "suspended") {
-    void ctx.resume();
-  }
-
-  void loadAlarmBuffer()
-    .then((buffer) => {
-      alarmBuffer = buffer;
+  audio.currentTime = 0;
+  void audio
+    .play()
+    .then(() => {
+      audio.pause();
+      audio.currentTime = 0;
+      unlocked = true;
     })
     .catch(() => {});
 }
 
 export function playAlarmSound() {
-  void (async () => {
-    const ctx = getAudioContext();
-    if (!ctx) {
-      playWithHtmlAudio();
-      return;
-    }
+  const audio = getAlarmAudio();
+  if (!audio) return;
 
-    if (ctx.state === "suspended") {
-      await ctx.resume();
-    }
-
-    try {
-      const buffer = alarmBuffer ?? (await loadAlarmBuffer());
-      alarmBuffer = buffer;
-
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-    } catch {
-      playWithHtmlAudio();
-    }
-  })();
-}
-
-function playWithHtmlAudio() {
-  const audio = new Audio(ALARM_URL);
+  audio.pause();
   audio.currentTime = 0;
-  void audio.play().catch(() => {});
+  void audio.play().catch(() => {
+    const fallback = new Audio(ALARM_SOUND_URL);
+    fallback.currentTime = 0;
+    void fallback.play().catch(() => {});
+  });
 }

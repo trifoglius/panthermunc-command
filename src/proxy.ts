@@ -15,7 +15,8 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname === "/robots.txt"
+    pathname === "/robots.txt" ||
+    /\.(?:wav|mp3|ogg|svg|png|jpe?g|gif|webp|ico)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
