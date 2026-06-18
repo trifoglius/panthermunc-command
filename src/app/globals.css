@@ -33,7 +33,7 @@ button {
 
 .globe-scene {
   position: fixed;
-  bottom: -44%;
+  bottom: -52%;
   left: -36%;
   z-index: 0;
   width: min(145vmin, 1180px);
