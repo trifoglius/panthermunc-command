@@ -119,7 +119,7 @@ export function VotingPapersPanel({ motion }: { motion: Motion }) {
       <p className="mb-3 text-sm text-purple-600">
         {rollCallMode
           ? "Vote counts are filled automatically from roll call voting above."
-          : "Log yes, no, and abstain counts for each draft resolution. Abstentions are excluded when determining the two-thirds majority required for adoption."}
+          : "Log yes, no, and abstain counts for each draft resolution."}
       </p>
       <div className="space-y-4">
         {votes.map((vote, index) => {

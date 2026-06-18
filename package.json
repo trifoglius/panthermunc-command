@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "vercel-build": "next build",
+    "dev": "npm run sync:rules && next dev",
+    "build": "npm run sync:rules && next build",
+    "vercel-build": "npm run sync:rules && next build",
+    "sync:rules": "cp rulesofprocedure.txt public/rulesofprocedure.txt",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",

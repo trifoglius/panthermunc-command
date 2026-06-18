@@ -129,7 +129,7 @@ export function StatsPanel() {
               { value: "round_robin", label: "Round Robin" },
               { value: "presentation", label: "Presentation" },
               { value: "qa", label: "Q&A" },
-              { value: "yield", label: "Yield (Rule 4)" },
+              { value: "yield", label: "Yield" },
             ]}
           />
           <Input

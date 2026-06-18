@@ -54,11 +54,6 @@ export function DocumentPanel() {
   return (
     <div className="space-y-4">
       <Card title="New Document">
-        <p className="mb-3 text-sm text-purple-700">
-          Working papers (Rule 12) may only be drafted during unmoderated
-          caucuses. Submitting to the dais converts to a draft resolution (Rule
-          13).
-        </p>
         <div className="grid gap-3 md:grid-cols-2">
           <Input
             label="Title"
@@ -94,19 +89,19 @@ export function DocumentPanel() {
         </div>
 
         <DelegateMultiSelect
-          label="Sponsors (Rule 15)"
+          label="Sponsors"
           delegates={activeCommittee.delegates}
           selected={sponsors}
           onToggle={(id) => setSponsors(toggleId(sponsors, id))}
         />
         <DelegateMultiSelect
-          label="Signatories (Rule 15)"
+          label="Signatories"
           delegates={activeCommittee.delegates}
           selected={signatories}
           onToggle={(id) => setSignatories(toggleId(signatories, id))}
         />
         <DelegateMultiSelect
-          label="Author's Panel (Rule 14)"
+          label="Author's Panel"
           delegates={activeCommittee.delegates}
           selected={authorPanel}
           onToggle={(id) => setAuthorPanel(toggleId(authorPanel, id))}
@@ -260,19 +255,19 @@ function DocumentRow({
       {editing && (
         <div className="mt-3 rounded-md border border-purple-100 bg-purple-50/50 p-3">
           <DelegateMultiSelect
-            label="Sponsors (Rule 15)"
+            label="Sponsors"
             delegates={committee.delegates}
             selected={sponsors}
             onToggle={(id) => setSponsors(toggleId(sponsors, id))}
           />
           <DelegateMultiSelect
-            label="Signatories (Rule 15)"
+            label="Signatories"
             delegates={committee.delegates}
             selected={signatories}
             onToggle={(id) => setSignatories(toggleId(signatories, id))}
           />
           <DelegateMultiSelect
-            label="Author's Panel (Rule 14)"
+            label="Author's Panel"
             delegates={committee.delegates}
             selected={authorPanel}
             onToggle={(id) => setAuthorPanel(toggleId(authorPanel, id))}

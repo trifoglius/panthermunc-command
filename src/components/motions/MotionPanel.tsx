@@ -188,9 +188,6 @@ export function MotionPanel() {
       )}
 
       <Card title="Propose Motion">
-        <p className="mb-3 text-sm text-purple-700">
-          Motions are voted on from most to least disruptive (Rule 3).
-        </p>
         <div className="grid gap-3 md:grid-cols-2">
           <Select
             label="Motion Type"
@@ -201,7 +198,7 @@ export function MotionPanel() {
             }}
             options={MOTION_TYPES.map((m) => ({
               value: m.id,
-              label: `Rule ${m.rule}: ${m.label}`,
+              label: m.label,
             }))}
           />
           <Select

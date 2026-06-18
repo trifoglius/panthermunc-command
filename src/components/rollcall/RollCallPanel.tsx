@@ -41,11 +41,7 @@ export function RollCallPanel() {
 
   return (
     <div className="space-y-4">
-      <Card title="Roll Call (Rule 2)">
-        <p className="mb-3 text-sm text-purple-700">
-          Conduct roll call before debate opens. Present states may abstain;
-          Present and Voting states must vote on all matters.
-        </p>
+      <Card title="Roll Call">
         <div className="flex flex-wrap items-end gap-3">
           <Input
             label="Session Label"
@@ -76,7 +72,7 @@ export function RollCallPanel() {
             <>
               <div className="mb-4 flex flex-wrap gap-3">
                 <Badge color={session.quorumMet ? "green" : "red"}>
-                  Quorum: {session.quorumMet ? "Met" : "Not Met"} (Rule 1)
+                  Quorum: {session.quorumMet ? "Met" : "Not Met"}
                 </Badge>
                 <Badge color="purple">
                   Present: {presentCount} / {activeCommittee.delegates.length}

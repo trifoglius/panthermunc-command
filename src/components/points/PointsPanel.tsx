@@ -27,7 +27,7 @@ export function PointsPanel() {
   const resolved = activeCommittee.points.filter((p) => p.resolved);
 
   return (
-    <Card title="Points (Rules 24–26)">
+    <Card title="Points">
       <p className="mb-3 text-sm text-purple-700">
         Record points of order, personal privilege, and inquiry raised during
         committee.
@@ -38,12 +38,12 @@ export function PointsPanel() {
           value={pointType}
           onChange={(e) => setPointType(e.target.value as PointType)}
           options={[
-            { value: "order", label: "Point of Order (Rule 24)" },
+            { value: "order", label: "Point of Order" },
             {
               value: "privilege",
-              label: "Point of Personal Privilege (Rule 25)",
+              label: "Point of Personal Privilege",
             },
-            { value: "inquiry", label: "Point of Inquiry (Rule 26)" },
+            { value: "inquiry", label: "Point of Inquiry" },
           ]}
         />
         <Select

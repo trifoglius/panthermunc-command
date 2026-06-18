@@ -2,7 +2,8 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
-import { canAccessAllCommittees, hasPermission } from "@/lib/permissions";
+import { canAccessAllCommittees, hasAnyPermission, hasPermission } from "@/lib/permissions";
+import type { Permission } from "@/lib/permissions";
 import { Button } from "@/components/ui";
 
 const TABS = [
@@ -13,6 +14,11 @@ const TABS = [
   { id: "documents", label: "Documents", perm: "committee:operate" as const },
   { id: "scoring", label: "Scoring", perm: "scoring:edit" as const },
   { id: "stats", label: "Stats & Export", perm: "committee:operate" as const },
+  {
+    id: "rules",
+    label: "Rules of Procedure",
+    anyOf: ["committee:operate", "scoring:edit"] as Permission[],
+  },
 ] as const;
 
 export type TabId = (typeof TABS)[number]["id"];
@@ -30,7 +36,11 @@ export function CommitteeNav({
   if (!conference || !user) return null;
 
   const showAllCommittees = canAccessAllCommittees(user);
-  const visibleTabs = TABS.filter((tab) => hasPermission(user, tab.perm));
+  const visibleTabs = TABS.filter((tab) =>
+    "perm" in tab
+      ? hasPermission(user, tab.perm)
+      : hasAnyPermission(user, tab.anyOf)
+  );
 
   return (
     <nav className="border-b border-purple-200 bg-purple-50">

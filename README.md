@@ -54,4 +54,4 @@ Full conference export includes all committees.
 
 ## Rules Reference
 
-Built-in support aligns with PantherMUNC Rules of Procedure and Awards Policies provided in the parent directory.
+Built-in support aligns with PantherMUNC Rules of Procedure (`rulesofprocedure.txt` in this project) and Awards Policies in the parent directory.
