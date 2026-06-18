@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { RotatingGlobe } from "@/components/login/RotatingGlobe";
 import { Button, Card, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 
@@ -78,8 +79,9 @@ function LoginForm() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-purple-800">
-        Loading...
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-purple-50 text-purple-800">
+        <RotatingGlobe className="h-32 w-32" />
+        <p>Loading...</p>
       </div>
     );
   }
@@ -87,7 +89,8 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-purple-50 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <RotatingGlobe className="mb-6 h-36 w-36 sm:h-40 sm:w-40" />
           <h1 className="text-2xl font-bold text-purple-900">
             PantherMUNC Conference Management System
           </h1>
@@ -151,8 +154,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center text-purple-800">
-          Loading...
+        <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-purple-50 text-purple-800">
+          <RotatingGlobe className="h-32 w-32" />
+          <p>Loading...</p>
         </div>
       }
     >

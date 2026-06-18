@@ -30,3 +30,7 @@ textarea,
 button {
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.globe-tilt {
+  transform: perspective(600px) rotateX(18deg);
+}
