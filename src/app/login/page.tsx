@@ -2,20 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { RotatingGlobe } from "@/components/login/RotatingGlobe";
 import { Button, Card, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
-
-function LoginShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-purple-50">
-      <RotatingGlobe />
-      <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function LoginForm() {
   const { user, authLoading, login } = useAuth();
@@ -89,85 +77,73 @@ function LoginForm() {
   };
 
   if (authLoading) {
-    return (
-      <LoginShell>
-        <p className="text-purple-800">Loading...</p>
-      </LoginShell>
-    );
+    return <p className="text-purple-800">Loading...</p>;
   }
 
   return (
-    <LoginShell>
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-purple-900">
-            PantherMUNC Conference Management System
-          </h1>
-          <p className="mt-1 text-sm text-purple-600">Sign in to continue</p>
-        </div>
-        <Card>
-          <form onSubmit={handleSubmit} className="grid gap-4">
-            <Input
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-              autoFocus
-            />
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            {info && <p className="text-sm text-green-700">{info}</p>}
-            <Button
-              type="submit"
-              disabled={submitting || !username || !password}
-            >
-              {submitting ? "Signing in..." : "Sign In"}
-            </Button>
-            <div className="border-t border-purple-100 pt-4">
-              <Input
-                label="Bootstrap Admin Password"
-                type="password"
-                value={bootstrapPassword}
-                onChange={(e) => setBootstrapPassword(e.target.value)}
-                autoComplete="off"
-                placeholder="Required to initialize system"
-              />
-              <p className="mt-1 text-xs text-purple-600">
-                Only conference admins with the bootstrap password can initialize
-                or recover the system.
-              </p>
-              <Button
-                type="button"
-                variant="secondary"
-                className="mt-3 w-full"
-                onClick={handleBootstrap}
-                disabled={bootstrapping || !bootstrapPassword}
-              >
-                {bootstrapping ? "Initializing..." : "Initialize / Recover Admin"}
-              </Button>
-            </div>
-          </form>
-        </Card>
+    <div className="w-full max-w-sm">
+      <div className="mb-8 text-center">
+        <h1 className="text-2xl font-bold text-purple-900">
+          PantherMUNC Conference Management System
+        </h1>
+        <p className="mt-1 text-sm text-purple-600">Sign in to continue</p>
       </div>
-    </LoginShell>
+      <Card>
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <Input
+            label="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            autoFocus
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {info && <p className="text-sm text-green-700">{info}</p>}
+          <Button
+            type="submit"
+            disabled={submitting || !username || !password}
+          >
+            {submitting ? "Signing in..." : "Sign In"}
+          </Button>
+          <div className="border-t border-purple-100 pt-4">
+            <Input
+              label="Bootstrap Admin Password"
+              type="password"
+              value={bootstrapPassword}
+              onChange={(e) => setBootstrapPassword(e.target.value)}
+              autoComplete="off"
+              placeholder="Required to initialize system"
+            />
+            <p className="mt-1 text-xs text-purple-600">
+              Only conference admins with the bootstrap password can initialize
+              or recover the system.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3 w-full"
+              onClick={handleBootstrap}
+              disabled={bootstrapping || !bootstrapPassword}
+            >
+              {bootstrapping ? "Initializing..." : "Initialize / Recover Admin"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <LoginShell>
-          <p className="text-purple-800">Loading...</p>
-        </LoginShell>
-      }
-    >
+    <Suspense fallback={<p className="text-purple-800">Loading...</p>}>
       <LoginForm />
     </Suspense>
   );
