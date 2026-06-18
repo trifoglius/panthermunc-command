@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { playAlarmSound } from "@/lib/alarm-sound";
+import { playAlarmSound, unlockAlarmSound } from "@/lib/alarm-sound";
 
 export function useCountdown(initialSeconds: number) {
   const [seconds, setSeconds] = useState(initialSeconds);
@@ -24,7 +24,10 @@ export function useCountdown(initialSeconds: number) {
     [clear]
   );
 
-  const start = useCallback(() => setRunning(true), []);
+  const start = useCallback(() => {
+    unlockAlarmSound();
+    setRunning(true);
+  }, []);
   const pause = useCallback(() => setRunning(false), []);
 
   useEffect(() => {

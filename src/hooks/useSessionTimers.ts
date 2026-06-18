@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { playAlarmSound } from "@/lib/alarm-sound";
+import { playAlarmSound, unlockAlarmSound } from "@/lib/alarm-sound";
 
 export type TimerMode = "none" | "total" | "speaking";
 
@@ -46,6 +46,16 @@ export function useSessionTimers(
     resetSpeaking();
   }, [stop, resetTotal, resetSpeaking]);
 
+  const startTotal = useCallback(() => {
+    unlockAlarmSound();
+    setMode("total");
+  }, []);
+
+  const startSpeaking = useCallback(() => {
+    unlockAlarmSound();
+    setMode("speaking");
+  }, []);
+
   useEffect(() => {
     clear();
     if (mode === "none") return;
@@ -86,8 +96,8 @@ export function useSessionTimers(
     totalSeconds,
     speakingSeconds,
     mode,
-    startTotal: () => setMode("total"),
-    startSpeaking: () => setMode("speaking"),
+    startTotal,
+    startSpeaking,
     pause: stop,
     resetSpeaking,
     resetTotal,
