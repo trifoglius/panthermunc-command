@@ -1,95 +1,53 @@
-const RADIUS = 90;
-const CENTER = 100;
+import {
+  CONTINENT_DOTS,
+  MERIDIAN_COUNT,
+  PARALLELS,
+} from "@/components/login/globe-continents";
 
-const PARALLELS = [-60, -30, 0, 30, 60];
-const MERIDIANS = Array.from({ length: 12 }, (_, i) => i * 15);
-
-function parallelRing(latDeg: number) {
+function parallelTransform(latDeg: number) {
   const lat = (latDeg * Math.PI) / 180;
-  const cy = CENTER - RADIUS * Math.sin(lat);
-  const rx = RADIUS * Math.cos(lat);
-  const ry = Math.max(rx * 0.35, 1.5);
-  return { cy, rx, ry };
+  const y = -Math.sin(lat) * 50;
+  const scale = Math.cos(lat);
+  return `translateY(${y}%) rotateX(90deg) scale(${scale})`;
 }
 
-export function RotatingGlobe({ className = "" }: { className?: string }) {
+export function RotatingGlobe() {
   return (
-    <div
-      className={`globe-tilt pointer-events-none select-none ${className}`}
-      aria-hidden
-    >
-      <svg viewBox="0 0 200 200" className="h-full w-full drop-shadow-lg">
-        <defs>
-          <radialGradient id="globeGradient" cx="35%" cy="30%" r="70%">
-            <stop offset="0%" stopColor="#b07cc6" />
-            <stop offset="55%" stopColor="#7d3c98" />
-            <stop offset="100%" stopColor="#4a235a" />
-          </radialGradient>
-          <clipPath id="globeClip">
-            <circle cx={CENTER} cy={CENTER} r={RADIUS} />
-          </clipPath>
-        </defs>
+    <div className="globe-scene" aria-hidden>
+      <div className="globe-shell">
+        <div className="globe">
+          <div className="globe-ring globe-outline" />
 
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="url(#globeGradient)"
-        />
-
-        <g clipPath="url(#globeClip)">
-          {PARALLELS.map((lat) => {
-            const { cy, rx, ry } = parallelRing(lat);
-            return (
-              <ellipse
-                key={`parallel-${lat}`}
-                cx={CENTER}
-                cy={cy}
-                rx={rx}
-                ry={ry}
-                fill="none"
-                stroke="rgba(232, 218, 239, 0.75)"
-                strokeWidth="1.25"
-              />
-            );
-          })}
-
-          <g className="globe-meridians">
-            <animateTransform
-              attributeName="transform"
-              type="rotate"
-              from={`0 ${CENTER} ${CENTER}`}
-              to={`360 ${CENTER} ${CENTER}`}
-              dur="20s"
-              repeatCount="indefinite"
+          {Array.from({ length: MERIDIAN_COUNT }, (_, i) => (
+            <div
+              key={`meridian-${i}`}
+              className="globe-ring globe-meridian"
+              style={{ transform: `rotateY(${i * (180 / MERIDIAN_COUNT)}deg)` }}
             />
-            {MERIDIANS.map((angle) => {
-              const rx = RADIUS * Math.abs(Math.sin((angle * Math.PI) / 180));
-              return (
-                <ellipse
-                  key={`meridian-${angle}`}
-                  cx={CENTER}
-                  cy={CENTER}
-                  rx={Math.max(rx, 0.75)}
-                  ry={RADIUS}
-                  fill="none"
-                  stroke="rgba(232, 218, 239, 0.75)"
-                  strokeWidth="1.25"
-                />
-              );
-            })}
-          </g>
-        </g>
+          ))}
 
-        <circle
-          cx={CENTER}
-          cy={CENTER}
-          r={RADIUS}
-          fill="none"
-          stroke="rgba(91, 44, 111, 0.55)"
-          strokeWidth="1.5"
-        />
-      </svg>
+          {PARALLELS.map((lat) => (
+            <div
+              key={`parallel-${lat}`}
+              className="globe-ring globe-parallel"
+              style={{ transform: parallelTransform(lat) }}
+            />
+          ))}
+
+          {CONTINENT_DOTS.map(([lat, lon], i) => (
+            <div
+              key={`dot-${i}`}
+              className="globe-dot"
+              style={
+                {
+                  "--lat": lat,
+                  "--lon": `${lon}deg`,
+                } as React.CSSProperties
+              }
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

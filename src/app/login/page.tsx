@@ -6,6 +6,17 @@ import { RotatingGlobe } from "@/components/login/RotatingGlobe";
 import { Button, Card, Input } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 
+function LoginShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-purple-50">
+      <RotatingGlobe />
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function LoginForm() {
   const { user, authLoading, login } = useAuth();
   const router = useRouter();
@@ -79,18 +90,16 @@ function LoginForm() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-purple-50 text-purple-800">
-        <RotatingGlobe className="h-32 w-32" />
-        <p>Loading...</p>
-      </div>
+      <LoginShell>
+        <p className="text-purple-800">Loading...</p>
+      </LoginShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-purple-50 px-4">
+    <LoginShell>
       <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <RotatingGlobe className="mb-6 h-36 w-36 sm:h-40 sm:w-40" />
+        <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-purple-900">
             PantherMUNC Conference Management System
           </h1>
@@ -146,7 +155,7 @@ function LoginForm() {
           </form>
         </Card>
       </div>
-    </div>
+    </LoginShell>
   );
 }
 
@@ -154,10 +163,9 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-purple-50 text-purple-800">
-          <RotatingGlobe className="h-32 w-32" />
-          <p>Loading...</p>
-        </div>
+        <LoginShell>
+          <p className="text-purple-800">Loading...</p>
+        </LoginShell>
       }
     >
       <LoginForm />
