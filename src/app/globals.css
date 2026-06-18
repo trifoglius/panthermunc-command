@@ -33,7 +33,7 @@ button {
 
 .globe-scene {
   position: fixed;
-  bottom: -52%;
+  bottom: -55%;
   left: -36%;
   z-index: 0;
   width: min(145vmin, 1180px);
@@ -47,7 +47,7 @@ button {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transform: rotateZ(-32deg) rotateX(24deg);
+  transform: rotateZ(-26deg) rotateX(18deg);
 }
 
 .globe {
