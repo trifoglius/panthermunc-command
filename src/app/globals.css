@@ -83,6 +83,14 @@ button {
   transition: stroke 450ms ease;
 }
 
+.globe-rim {
+  fill: none;
+  stroke: rgba(108, 52, 131, 0.55);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 450ms ease;
+}
+
 .globe-dot {
   fill: rgba(108, 52, 131, 0.82);
   transition: fill 450ms ease;
@@ -97,8 +105,296 @@ button {
   stroke: rgba(255, 255, 255, 0.55);
 }
 
+.login-theme-admin .globe-rim {
+  stroke: rgba(255, 255, 255, 0.55);
+}
+
 .login-theme-admin .globe-dot {
   fill: rgba(255, 255, 255, 0.82);
+}
+
+.header-dot-matrix {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.header-globe-scene {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  user-select: none;
+  contain: strict;
+}
+
+.header-globe-theme .globe-meridian,
+.header-globe-theme .globe-parallel {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 0.46;
+}
+
+.header-globe-theme .globe-outline {
+  stroke: rgba(255, 255, 255, 0.48);
+  stroke-width: 0.44;
+}
+
+.header-globe-theme .globe-rim {
+  stroke: rgba(255, 255, 255, 0.58);
+  stroke-width: 0.48;
+}
+
+.header-globe-theme .globe-continent {
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 0.42;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+@keyframes globe-flash-green-grid {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.5);
+  }
+
+  40% {
+    stroke: rgba(134, 239, 172, 0.88);
+  }
+}
+
+@keyframes globe-flash-green-outline {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.48);
+  }
+
+  40% {
+    stroke: rgba(134, 239, 172, 0.92);
+  }
+}
+
+@keyframes globe-flash-green-rim {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.58);
+  }
+
+  40% {
+    stroke: rgba(134, 239, 172, 0.95);
+  }
+}
+
+@keyframes globe-flash-red-grid {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.5);
+  }
+
+  40% {
+    stroke: rgba(252, 165, 165, 0.88);
+  }
+}
+
+@keyframes globe-flash-red-outline {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.48);
+  }
+
+  40% {
+    stroke: rgba(252, 165, 165, 0.92);
+  }
+}
+
+@keyframes globe-flash-red-rim {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.58);
+  }
+
+  40% {
+    stroke: rgba(252, 165, 165, 0.95);
+  }
+}
+
+.header-globe-scene.globe-flash-pass .globe-meridian,
+.header-globe-scene.globe-flash-pass .globe-parallel {
+  animation: globe-flash-green-grid 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-pass .globe-outline {
+  animation: globe-flash-green-outline 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-pass .globe-rim {
+  animation: globe-flash-green-rim 1100ms ease-in-out;
+}
+
+@keyframes globe-flash-green-continent {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.88);
+  }
+
+  40% {
+    stroke: rgba(134, 239, 172, 0.98);
+  }
+}
+
+.header-globe-scene.globe-flash-pass .globe-continent {
+  animation: globe-flash-green-continent 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-fail .globe-meridian,
+.header-globe-scene.globe-flash-fail .globe-parallel {
+  animation: globe-flash-red-grid 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-fail .globe-outline {
+  animation: globe-flash-red-outline 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-fail .globe-rim {
+  animation: globe-flash-red-rim 1100ms ease-in-out;
+}
+
+@keyframes globe-flash-red-continent {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.88);
+  }
+
+  40% {
+    stroke: rgba(252, 165, 165, 0.98);
+  }
+}
+
+.header-globe-scene.globe-flash-fail .globe-continent {
+  animation: globe-flash-red-continent 1100ms ease-in-out;
+}
+
+@keyframes globe-flash-blue-grid {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.5);
+  }
+
+  40% {
+    stroke: rgba(147, 197, 253, 0.88);
+  }
+}
+
+@keyframes globe-flash-blue-outline {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.48);
+  }
+
+  40% {
+    stroke: rgba(147, 197, 253, 0.92);
+  }
+}
+
+@keyframes globe-flash-blue-rim {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.58);
+  }
+
+  40% {
+    stroke: rgba(147, 197, 253, 0.95);
+  }
+}
+
+@keyframes globe-flash-yellow-grid {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.5);
+  }
+
+  40% {
+    stroke: rgba(253, 224, 71, 0.88);
+  }
+}
+
+@keyframes globe-flash-yellow-outline {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.48);
+  }
+
+  40% {
+    stroke: rgba(253, 224, 71, 0.92);
+  }
+}
+
+@keyframes globe-flash-yellow-rim {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.58);
+  }
+
+  40% {
+    stroke: rgba(253, 224, 71, 0.95);
+  }
+}
+
+.header-globe-scene.globe-flash-notification .globe-meridian,
+.header-globe-scene.globe-flash-notification .globe-parallel {
+  animation: globe-flash-blue-grid 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-notification .globe-outline {
+  animation: globe-flash-blue-outline 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-notification .globe-rim {
+  animation: globe-flash-blue-rim 1100ms ease-in-out;
+}
+
+@keyframes globe-flash-blue-continent {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.88);
+  }
+
+  40% {
+    stroke: rgba(147, 197, 253, 0.98);
+  }
+}
+
+.header-globe-scene.globe-flash-notification .globe-continent {
+  animation: globe-flash-blue-continent 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-timer .globe-meridian,
+.header-globe-scene.globe-flash-timer .globe-parallel {
+  animation: globe-flash-yellow-grid 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-timer .globe-outline {
+  animation: globe-flash-yellow-outline 1100ms ease-in-out;
+}
+
+.header-globe-scene.globe-flash-timer .globe-rim {
+  animation: globe-flash-yellow-rim 1100ms ease-in-out;
+}
+
+@keyframes globe-flash-yellow-continent {
+  0%,
+  100% {
+    stroke: rgba(255, 255, 255, 0.88);
+  }
+
+  40% {
+    stroke: rgba(253, 224, 71, 0.98);
+  }
+}
+
+.header-globe-scene.globe-flash-timer .globe-continent {
+  animation: globe-flash-yellow-continent 1100ms ease-in-out;
 }
 
 .login-shell {
@@ -132,8 +428,18 @@ button {
   .globe-meridian,
   .globe-parallel,
   .globe-outline,
-  .globe-dot {
+  .globe-rim,
+  .globe-dot,
+  .header-globe-scene.globe-flash-pass .globe-meridian,
+  .header-globe-scene.globe-flash-pass .globe-parallel,
+  .header-globe-scene.globe-flash-pass .globe-outline,
+  .header-globe-scene.globe-flash-pass .globe-rim,
+  .header-globe-scene.globe-flash-fail .globe-meridian,
+  .header-globe-scene.globe-flash-fail .globe-parallel,
+  .header-globe-scene.globe-flash-fail .globe-outline,
+  .header-globe-scene.globe-flash-fail .globe-rim {
     transition: none;
+    animation: none;
   }
 
   .login-panel-inner {

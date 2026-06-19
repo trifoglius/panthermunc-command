@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { playAlarmSound, unlockAlarmSound } from "@/lib/alarm-sound";
 
 export function useCountdown(initialSeconds: number) {
+  const { triggerFlash } = useHeaderGlobeFlash();
   const [seconds, setSeconds] = useState(initialSeconds);
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -48,6 +50,7 @@ export function useCountdown(initialSeconds: number) {
         secondsRef.current = 0;
         setSeconds(0);
         if (current > 0) {
+          triggerFlash("timer");
           playAlarmSound();
         }
         return;
@@ -59,7 +62,7 @@ export function useCountdown(initialSeconds: number) {
     }, 1000);
 
     return clear;
-  }, [running, clear]);
+  }, [running, clear, triggerFlash]);
 
   return { seconds, running, start, pause, reset, setRunning };
 }

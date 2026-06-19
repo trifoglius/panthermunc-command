@@ -12,8 +12,6 @@ The purple rotating globe on the login screen is a decorative background element
 | `src/app/globals.css` | Globe and login-panel styling (`.globe-*`, `.login-panel`) |
 | `src/app/login/layout.tsx` | Mounts `<RotatingGlobe />` once for the whole `/login` route |
 
-The globe is **not** used elsewhere in the app.
-
 ## High-level design
 
 The globe is drawn as **one SVG** updated every frame with `requestAnimationFrame`. Each frame:

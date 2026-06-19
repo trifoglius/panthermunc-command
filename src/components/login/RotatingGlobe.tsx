@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
+import type { HeaderGlobeFlashKind } from "@/context/HeaderGlobeFlashContext";
 import {
   CONTINENT_DOTS,
+  CONTINENT_OUTLINES,
+  isLandPoint,
   MERIDIAN_COUNT,
   PARALLELS,
 } from "@/components/login/globe-continents";
@@ -10,14 +13,39 @@ import {
   GLOBE_CENTER,
   GLOBE_RADIUS,
   GLOBE_VIEW_SIZE,
+  continentOutlinePath,
   meridianPath,
   parallelPath,
   projectPoint,
 } from "@/components/login/globe-projection";
 
 const SPIN_MS = 52_000;
+const HEADER_MERIDIAN_COUNT = 6;
+const HEADER_PARALLELS = [-45, 45] as const;
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+const FLASH_CLASSES = [
+  "globe-flash-pass",
+  "globe-flash-fail",
+  "globe-flash-notification",
+  "globe-flash-timer",
+] as const;
+
+function flashClassFor(kind: HeaderGlobeFlashKind | null | undefined) {
+  switch (kind) {
+    case "pass":
+      return "globe-flash-pass";
+    case "fail":
+      return "globe-flash-fail";
+    case "notification":
+      return "globe-flash-notification";
+    case "timer":
+      return "globe-flash-timer";
+    default:
+      return "";
+  }
+}
 
 function applyGlobeMetrics(el: HTMLElement) {
   const vmin = Math.min(window.innerWidth, window.innerHeight);
@@ -38,15 +66,28 @@ function createPath(
   return path;
 }
 
-function createDot(svg: SVGSVGElement): SVGCircleElement {
+function createDot(svg: SVGSVGElement, radius = "0.42"): SVGCircleElement {
   const dot = document.createElementNS(SVG_NS, "circle");
   dot.setAttribute("class", "globe-dot");
-  dot.setAttribute("r", "0.42");
+  dot.setAttribute("r", radius);
   svg.appendChild(dot);
   return dot;
 }
 
-export function RotatingGlobe() {
+type RotatingGlobeProps = {
+  variant?: "login" | "header";
+  flash?: HeaderGlobeFlashKind;
+  /** Bumps when a flash is re-triggered so CSS animation restarts without remounting. */
+  flashKey?: number;
+  size?: number;
+};
+
+export function RotatingGlobe({
+  variant = "login",
+  flash = null,
+  flashKey = 0,
+  size = 42,
+}: RotatingGlobeProps) {
   const sceneRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const frameRef = useRef<{
@@ -54,9 +95,12 @@ export function RotatingGlobe() {
     meridians: SVGPathElement[];
     parallels: SVGPathElement[];
     dots: SVGCircleElement[];
+    continents: SVGPathElement[];
   } | null>(null);
 
   useLayoutEffect(() => {
+    if (variant === "header") return;
+
     const el = sceneRef.current;
     if (!el) return;
 
@@ -80,24 +124,40 @@ export function RotatingGlobe() {
       window.removeEventListener("resize", scheduleUpdate);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
     };
-  }, []);
+  }, [variant]);
 
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg || frameRef.current) return;
 
+    const isHeader = variant === "header";
+    const meridianCount = isHeader ? HEADER_MERIDIAN_COUNT : MERIDIAN_COUNT;
+    const parallelLats = isHeader
+      ? [...HEADER_PARALLELS]
+      : PARALLELS.filter((lat) => lat !== 0);
+
     const outline = createPath(svg, "globe-outline");
-    const meridians = Array.from({ length: MERIDIAN_COUNT }, () =>
+    const meridians = Array.from({ length: meridianCount }, () =>
       createPath(svg, "globe-meridian")
     );
-    const parallels = PARALLELS.filter((lat) => lat !== 0).map(() =>
-      createPath(svg, "globe-parallel")
-    );
-    const dots = CONTINENT_DOTS.map(() => createDot(svg));
+    const parallels = parallelLats.map(() => createPath(svg, "globe-parallel"));
+    const dots = isHeader
+      ? []
+      : CONTINENT_DOTS.map(() => createDot(svg, "0.42"));
+    const continents = isHeader
+      ? CONTINENT_OUTLINES.map(() => createPath(svg, "globe-continent"))
+      : [];
 
-    frameRef.current = { outline, meridians, parallels, dots };
+    const rim = document.createElementNS(SVG_NS, "circle");
+    rim.setAttribute("class", "globe-rim");
+    rim.setAttribute("cx", String(GLOBE_CENTER));
+    rim.setAttribute("cy", String(GLOBE_CENTER));
+    rim.setAttribute("r", String(GLOBE_RADIUS));
+    rim.setAttribute("fill", "none");
+    svg.appendChild(rim);
 
-    const parallelLats = PARALLELS.filter((lat) => lat !== 0);
+    frameRef.current = { outline, meridians, parallels, dots, continents };
+
     const start = performance.now();
     let raf = 0;
 
@@ -106,24 +166,31 @@ export function RotatingGlobe() {
       if (!frame) return;
 
       const rotY = (((now - start) % SPIN_MS) / SPIN_MS) * 360;
+      const landClip = isHeader ? isLandPoint : undefined;
 
-      frame.outline.setAttribute("d", parallelPath(0, rotY));
+      frame.outline.setAttribute("d", parallelPath(0, rotY, landClip));
 
       frame.meridians.forEach((path, i) => {
-        const lon = i * (180 / MERIDIAN_COUNT);
-        path.setAttribute("d", meridianPath(lon, rotY));
+        const lon = i * (180 / meridianCount);
+        path.setAttribute("d", meridianPath(lon, rotY, landClip));
       });
 
       frame.parallels.forEach((path, i) => {
-        path.setAttribute("d", parallelPath(parallelLats[i], rotY));
+        path.setAttribute("d", parallelPath(parallelLats[i], rotY, landClip));
       });
 
-      frame.dots.forEach((dot, i) => {
-        const [lat, lon] = CONTINENT_DOTS[i];
-        const [x, y] = projectPoint(lat, lon, rotY);
-        dot.setAttribute("cx", x.toFixed(2));
-        dot.setAttribute("cy", y.toFixed(2));
-      });
+      if (isHeader) {
+        frame.continents.forEach((path, i) => {
+          path.setAttribute("d", continentOutlinePath(CONTINENT_OUTLINES[i], rotY));
+        });
+      } else {
+        frame.dots.forEach((dot, i) => {
+          const [lat, lon] = CONTINENT_DOTS[i];
+          const [x, y] = projectPoint(lat, lon, rotY);
+          dot.setAttribute("cx", x.toFixed(2));
+          dot.setAttribute("cy", y.toFixed(2));
+        });
+      }
 
       raf = requestAnimationFrame(render);
     };
@@ -134,10 +201,40 @@ export function RotatingGlobe() {
       frameRef.current = null;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
     };
-  }, []);
+  }, [variant]);
+
+  useEffect(() => {
+    if (variant !== "header" || !flash) return;
+
+    const el = sceneRef.current;
+    if (!el) return;
+
+    const activeClass = flashClassFor(flash);
+    for (const cls of FLASH_CLASSES) {
+      el.classList.remove(cls);
+    }
+    void el.offsetWidth;
+    el.classList.add(activeClass);
+  }, [variant, flash, flashKey]);
+
+  const sceneClass =
+    variant === "header"
+      ? "header-globe-scene header-globe-theme"
+      : "globe-scene";
+  const flashClass = flashClassFor(flash);
+
+  const headerStyle: CSSProperties | undefined =
+    variant === "header"
+      ? { width: size, height: size, flexShrink: 0 }
+      : undefined;
 
   return (
-    <div className="globe-scene" ref={sceneRef} aria-hidden>
+    <div
+      className={`${sceneClass} ${flashClass}`.trim()}
+      ref={sceneRef}
+      style={headerStyle}
+      aria-hidden
+    >
       <svg
         ref={svgRef}
         className="globe-svg"

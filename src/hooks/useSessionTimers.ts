@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { playAlarmSound, unlockAlarmSound } from "@/lib/alarm-sound";
 
 export type TimerMode = "none" | "total" | "speaking";
@@ -9,6 +10,7 @@ export function useSessionTimers(
   totalInitial: number,
   speakingInitial: number
 ) {
+  const { triggerFlash } = useHeaderGlobeFlash();
   const [totalSeconds, setTotalSeconds] = useState(totalInitial);
   const [speakingSeconds, setSpeakingSeconds] = useState(speakingInitial);
   const [mode, setMode] = useState<TimerMode>("none");
@@ -95,12 +97,13 @@ export function useSessionTimers(
       }
 
       if (expired) {
+        triggerFlash("timer");
         playAlarmSound();
       }
     }, 1000);
 
     return clear;
-  }, [mode, clear, totalInitial]);
+  }, [mode, clear, totalInitial, triggerFlash]);
 
   return {
     totalSeconds,

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { exportConferenceLogs } from "@/lib/conference-logs-export";
 import {
   exportCommitteeToExcel,
@@ -17,11 +18,14 @@ import {
   Select,
   useToast,
 } from "@/components/ui";
+import { HeaderDotMatrix } from "@/components/layout/HeaderDotMatrix";
+import { RotatingGlobe } from "@/components/login/RotatingGlobe";
 import type { CommitteeType } from "@/lib/types";
 
 export function Header() {
   const { user, logout, authLoading } = useAuth();
   const { conference, createCommittee, activeCommittee } = useConference();
+  const { flash, flashKey } = useHeaderGlobeFlash();
   const { success } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -155,17 +159,26 @@ export function Header() {
   );
 
   return (
-    <header className="border-b border-purple-200 bg-[var(--header-bg)] text-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold md:text-xl">
-            PantherMUNC Command
-          </h1>
-          <p className="truncate text-xs text-purple-200 md:text-sm">
-            {conference
-              ? `${conference.name} ${conference.year}`
-              : "Conference Management"}
-          </p>
+    <header className="relative overflow-hidden border-b border-purple-200 bg-[var(--header-bg)] text-white">
+      <HeaderDotMatrix />
+      <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <RotatingGlobe
+            variant="header"
+            flash={flash}
+            flashKey={flashKey}
+            size={42}
+          />
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-bold md:text-xl">
+              PantherMUNC Command
+            </h1>
+            <p className="truncate text-xs text-purple-200 md:text-sm">
+              {conference
+                ? `${conference.name} ${conference.year}`
+                : "Conference Management"}
+            </p>
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -213,13 +226,13 @@ export function Header() {
       </div>
 
       {showMobileMenu && conference && (
-        <div className="flex flex-wrap gap-2 border-t border-purple-700 px-4 py-3 md:hidden">
+        <div className="relative z-10 flex flex-wrap gap-2 border-t border-purple-700 px-4 py-3 md:hidden">
           {actionButtons}
         </div>
       )}
 
       {showAdd && canManageConference && conference && (
-        <div className="border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
+        <div className="relative z-10 border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
           <div className="mx-auto max-w-3xl">
             <Card title="New Committee">
               <div className="grid gap-3 md:grid-cols-4">

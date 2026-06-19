@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { CommitteeNav } from "@/components/layout/CommitteeNav";
 import { Header } from "@/components/layout/Header";
 import { LoadingScreen } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useWorkspaceNavigation } from "@/hooks/useWorkspaceNavigation";
 import { canAccessAllCommittees } from "@/lib/permissions";
@@ -14,9 +15,28 @@ import { canAccessAllCommittees } from "@/lib/permissions";
 function NotificationBanner() {
   const { user, authLoading } = useAuth();
   const { loading } = useConference();
+  const { triggerFlash } = useHeaderGlobeFlash();
+  const seenIdsRef = useRef<Set<string> | null>(null);
   const { notifications, dismiss, dismissAll } = useNotifications(
     !authLoading && !loading && !!user?.committeeId
   );
+
+  useEffect(() => {
+    const currentIds = new Set(notifications.map((n) => n.id));
+    if (seenIdsRef.current === null) {
+      seenIdsRef.current = currentIds;
+      return;
+    }
+
+    for (const id of currentIds) {
+      if (!seenIdsRef.current.has(id)) {
+        triggerFlash("notification");
+        break;
+      }
+    }
+
+    seenIdsRef.current = currentIds;
+  }, [notifications, triggerFlash]);
 
   if (notifications.length === 0) return null;
 
