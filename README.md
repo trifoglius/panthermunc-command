@@ -42,8 +42,12 @@ Conference data is stored in a server database and synced per committee. Use **E
 ## Excel Export
 
 Each committee export includes sheets for:
+- Committee Info
 - Delegate Stats
-- Motions
+- Motions (current queue and archived queues)
+- Motion Queues (speaker lists, voting speakers, presentation/Q&A delegates)
+- Speaking Events
+- Points
 - Documents
 - Roll Call
 - Awards Preview
