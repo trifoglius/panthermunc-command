@@ -101,9 +101,6 @@ function AdminSetupScreen() {
             onChange={(e) => setTopic(e.target.value)}
             placeholder="Committee topic"
           />
-          <p className="text-sm text-purple-600">
-            GA committees will be pre-loaded with 20 default countries.
-          </p>
           <Button onClick={handleCreate} disabled={saving || !committeeName.trim()}>
             {saving ? "Creating..." : "Create Committee & Start"}
           </Button>

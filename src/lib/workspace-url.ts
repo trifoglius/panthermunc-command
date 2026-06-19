@@ -13,7 +13,7 @@ export const WORKSPACE_TABS = [
   },
   { id: "documents", label: "Documents", perm: "committee:operate" as const },
   { id: "scoring", label: "Scoring", perm: "scoring:edit" as const },
-  { id: "stats", label: "Stats & Export", perm: "committee:operate" as const },
+  { id: "stats", label: "Stats", perm: "committee:operate" as const },
   {
     id: "rules",
     label: "Rules of Procedure",

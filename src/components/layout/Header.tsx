@@ -95,7 +95,7 @@ export function Header() {
         </Button>
       )}
       {conference && (canExportAll || activeCommittee) && (
-        <div className="relative" ref={exportRef}>
+        <div className="relative z-20" ref={exportRef}>
           <Button
             variant="secondary"
             size="sm"
@@ -109,7 +109,7 @@ export function Header() {
           {showExportMenu && (
             <div
               role="menu"
-              className="absolute right-0 z-50 mt-1 min-w-[12rem] rounded-md border border-purple-200 bg-white py-1 shadow-lg"
+              className="absolute right-0 z-20 mt-1 min-w-[12rem] rounded-md border border-purple-200 bg-white py-1 shadow-lg"
             >
               {activeCommittee && (
                 <button
@@ -159,8 +159,10 @@ export function Header() {
   );
 
   return (
-    <header className="relative overflow-hidden border-b border-purple-200 bg-[var(--header-bg)] text-white">
-      <HeaderDotMatrix />
+    <header className="relative border-b border-purple-200 bg-[var(--header-bg)] text-white">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <HeaderDotMatrix />
+      </div>
       <div className="relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <RotatingGlobe

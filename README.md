@@ -9,7 +9,7 @@ Conference management system/chair software for [PantherMUNC](https://panthermun
 - **Documents** — Working papers, draft resolutions, sponsors, signatories, author panels (Rules 12–15)
 - **Delegate Management** — Add countries, track position paper status (EPP/LPP)
 - **Scoring** — Separate judge and dais rubrics (GA & Crisis), composite scores, discrepancy/tie detection per Awards Policies AP.1
-- **Stats & Export** — Speaking events, points, awards preview, Excel export per committee or full conference
+- **Stats** — Speaking events, points, awards preview, Excel export per committee or full conference
 
 ## Design
 
