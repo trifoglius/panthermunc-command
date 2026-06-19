@@ -31,11 +31,10 @@ export function ScoringPanel() {
 
   return (
     <div className="space-y-4">
-      <Card title="Awards Scoring (AP.1)">
+      <Card title="Awards Scoring">
         <p className="mb-3 text-sm text-purple-700">
-          Judge and dais score independently. Composite score is the average
-          (AP.1.8). Scorers should not see each other&apos;s scores during
-          committee (AP.1.4).
+          Judge and dais score independently. Composite score is the average. Scorers should not see each other&apos;s scores during
+          committee.
         </p>
 
         <div className="mb-4 flex flex-wrap items-end gap-3">
@@ -49,7 +48,7 @@ export function ScoringPanel() {
             ]}
           />
           <Input
-            label="Discrepancy Threshold (AP.1.10)"
+            label="Discrepancy Threshold"
             type="number"
             value={activeCommittee.discrepancyThreshold}
             onChange={(e) =>
@@ -61,7 +60,7 @@ export function ScoringPanel() {
             className="max-w-xs"
           />
           <Button onClick={() => signScores(role)}>
-            Sign &amp; Submit Scoresheet (AP.2.1)
+            Sign &amp; Submit Scoresheet
           </Button>
         </div>
 
@@ -146,7 +145,7 @@ export function ScoringPanel() {
         </div>
       </Card>
 
-      <Card title="Verbal Commendation (AP.2.8)">
+      <Card title="Verbal Commendation">
         <p className="mb-3 text-sm text-purple-700">
           The verbal commendation is chosen by the Chair and cannot go to a best-in-committee award recipient.
         </p>
@@ -167,7 +166,7 @@ export function ScoringPanel() {
       </Card>
 
       {activeCommittee.type !== "crisis" && (
-        <Card title="Position Paper Scores (AP.3)">
+        <Card title="Position Paper Scores">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>

@@ -70,7 +70,7 @@ export function StatsPanel() {
           </div>
         </Card>
 
-        <Card title="Special Circumstances (AP.1.10)">
+        <Card title="Special Circumstances">
           {awards.specialCircumstances.length === 0 ? (
             <p className="text-sm text-green-700">No issues detected.</p>
           ) : (
@@ -91,7 +91,7 @@ export function StatsPanel() {
           {awards.noPositionPaper.length > 0 && (
             <div className="mt-3">
               <p className="text-sm font-medium text-purple-900">
-                No Position Paper (AP.1.5 / AP.3.4):
+                No Position Paper:
               </p>
               <p className="text-sm text-purple-700">
                 {awards.noPositionPaper.map((s) => s.country).join(", ")}

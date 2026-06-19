@@ -137,7 +137,7 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
         Simple majority: {simpleMajority} votes
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Supermajority ⅔: {superMajority} votes
+        Supermajority: {superMajority} votes
       </span>
     </div>
   );
