@@ -109,6 +109,11 @@ function AppShellNav() {
     return null;
   }
 
+  const hideCommitteeNav =
+    pathname === "/settings" || pathname.startsWith("/admin/users");
+
+  if (hideCommitteeNav) return null;
+
   const showTabs = pathname === "/";
   const showCommitteeNav =
     showTabs ||
