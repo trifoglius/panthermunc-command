@@ -44,7 +44,7 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-purple-900">
-            PantherMUNC Command
+            PantherMUNC Conference Management System
           </h1>
           <p className="mt-1 text-sm text-purple-600">Sign in to continue</p>
         </div>

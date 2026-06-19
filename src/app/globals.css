@@ -44,7 +44,7 @@ button {
 
 .globe-scene {
   position: fixed;
-  bottom: var(--globe-bottom, -55vh);
+  bottom: var(--globe-bottom, 4vh);
   left: var(--globe-left, -36vw);
   z-index: 0;
   width: var(--globe-size, min(145vmin, 1180px));
@@ -92,8 +92,26 @@ button {
 }
 
 .globe-dot {
-  fill: rgba(108, 52, 131, 0.82);
-  transition: fill 450ms ease;
+  fill: rgb(108, 52, 131);
+  fill-opacity: 0.82;
+  transition:
+    fill 450ms ease,
+    fill-opacity 450ms ease;
+}
+
+.globe-scene .globe-dot {
+  animation: globe-dot-pulse ease-in-out infinite;
+}
+
+@keyframes globe-dot-pulse {
+  0%,
+  100% {
+    fill-opacity: 0.34;
+  }
+
+  50% {
+    fill-opacity: 0.92;
+  }
 }
 
 .login-theme-admin .globe-meridian,
@@ -110,7 +128,8 @@ button {
 }
 
 .login-theme-admin .globe-dot {
-  fill: rgba(255, 255, 255, 0.82);
+  fill: rgb(255, 255, 255);
+  fill-opacity: 0.82;
 }
 
 .header-dot-matrix {

@@ -15,6 +15,7 @@ import {
   GLOBE_VIEW_SIZE,
   continentOutlinePath,
   meridianPath,
+  northPoleViewBoxY,
   parallelPath,
   projectPoint,
 } from "@/components/login/globe-projection";
@@ -47,11 +48,19 @@ function flashClassFor(kind: HeaderGlobeFlashKind | null | undefined) {
   }
 }
 
+const POLE_TOP_MARGIN = 24;
+
 function applyGlobeMetrics(el: HTMLElement) {
   const vmin = Math.min(window.innerWidth, window.innerHeight);
   const size = Math.min((145 * vmin) / 100, 1180);
+  const poleFraction = northPoleViewBoxY() / GLOBE_VIEW_SIZE;
+  const bottom =
+    POLE_TOP_MARGIN +
+    window.innerHeight -
+    size * (1 - poleFraction);
+
   el.style.setProperty("--globe-size", `${size}px`);
-  el.style.setProperty("--globe-bottom", `${-0.55 * window.innerHeight}px`);
+  el.style.setProperty("--globe-bottom", `${bottom}px`);
   el.style.setProperty("--globe-left", `${-0.36 * window.innerWidth}px`);
 }
 
@@ -66,10 +75,16 @@ function createPath(
   return path;
 }
 
-function createDot(svg: SVGSVGElement, radius = "0.42"): SVGCircleElement {
+function createDot(
+  svg: SVGSVGElement,
+  index: number,
+  radius = "0.42"
+): SVGCircleElement {
   const dot = document.createElementNS(SVG_NS, "circle");
   dot.setAttribute("class", "globe-dot");
   dot.setAttribute("r", radius);
+  dot.style.animationDelay = `${((index * 0.17) % 6.8).toFixed(2)}s`;
+  dot.style.animationDuration = `${4.2 + (index % 7) * 0.45}s`;
   svg.appendChild(dot);
   return dot;
 }
@@ -143,7 +158,7 @@ export function RotatingGlobe({
     const parallels = parallelLats.map(() => createPath(svg, "globe-parallel"));
     const dots = isHeader
       ? []
-      : CONTINENT_DOTS.map(() => createDot(svg, "0.42"));
+      : CONTINENT_DOTS.map((_, i) => createDot(svg, i, "0.42"));
     const continents = isHeader
       ? CONTINENT_OUTLINES.map(() => createPath(svg, "globe-continent"))
       : [];

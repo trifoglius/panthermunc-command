@@ -171,7 +171,7 @@ export function Header() {
           />
           <div className="min-w-0">
             <h1 className="truncate text-lg font-bold md:text-xl">
-              PantherMUNC Command
+              PantherMUNC Conference Management System
             </h1>
             <p className="truncate text-xs text-purple-200 md:text-sm">
               {conference

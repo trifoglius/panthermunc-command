@@ -135,6 +135,11 @@ export function projectPoint(
   return [projected.x, projected.y];
 }
 
+/** North pole Y in viewBox units; constant because spin is around the Y axis. */
+export function northPoleViewBoxY(): number {
+  return projectUnitPoint(0, 1, 0, 0).y;
+}
+
 type LandClip = (lat: number, lon: number) => boolean;
 
 const GRID_STEPS = 120;

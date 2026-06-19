@@ -1,6 +1,6 @@
-# PantherMUNC Command
+# PantherMUNC Conference Management System
 
-Conference management tool for [PantherMUNC](https://panthermunc.org), modeled after MUNCommand-style dais software. Built for roll call, motion tracking, document management, dual scoring (judge + dais), and Excel export.
+Conference management system/chair software for [PantherMUNC](https://panthermunc.org), modeled after MUNCommand-style dais software. Built for roll call, motion tracking, document management, dual scoring (judge + dais), and Excel export.
 
 ## Features
 
@@ -35,8 +35,6 @@ npm run build
 npm start
 ```
 
-For **panthermunc.org**, you can host this as a subdomain (e.g. `command.panthermunc.org`) alongside your Google Sites page.
-
 ## Data Storage
 
 Conference data is stored in a server database and synced per committee. Use **Export All Excel** or **Export All Conference Logs** on the Manage Conference page for backups and the Secretary of Analytics spreadsheet workflow (AP.1.7).
@@ -51,7 +49,3 @@ Each committee export includes sheets for:
 - Awards Preview
 
 Full conference export includes all committees.
-
-## Rules Reference
-
-Built-in support aligns with PantherMUNC Rules of Procedure (`rulesofprocedure.txt` in this project) and Awards Policies in the parent directory.

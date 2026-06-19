@@ -1,39 +1,3 @@
-/** Approximate continent silhouettes as [latitude, longitude] dot clusters. */
-export const CONTINENT_DOTS: readonly [number, number][] = [
-  [71, -156], [64, -165], [60, -140], [55, -130], [49, -125], [48, -123],
-  [45, -120], [40, -105], [35, -118], [32, -117], [30, -110], [25, -100],
-  [20, -105], [18, -98], [15, -92], [25, -80], [30, -85], [35, -80],
-  [40, -75], [45, -75], [47, -67], [48, -55], [52, -60], [58, -62],
-  [65, -75], [70, -95], [62, -100], [55, -100], [45, -65], [44, -70],
-  // South America
-  [12, -72], [8, -75], [5, -70], [0, -65], [-5, -60], [-10, -55],
-  [-15, -60], [-20, -65], [-25, -55], [-30, -58], [-35, -58], [-40, -65],
-  [-45, -72], [-50, -72], [-55, -68], [-35, -72], [-15, -45], [-5, -50],
-  [5, -52], [-10, -78], [-18, -70], [-22, -45],
-  // Europe
-  [62, 15], [58, 10], [55, 12], [52, 0], [50, 5], [48, 2],
-  [45, 3], [42, 3], [40, -4], [38, -6], [36, -5], [43, 12],
-  [46, 20], [50, 25], [54, 20], [60, 25], [65, 25], [70, 25],
-  [58, -3], [53, -2], [51, 12], [47, 8], [41, 20], [37, 22],
-  // Africa
-  [37, 10], [32, 8], [25, 12], [20, 15], [15, 15], [10, 15],
-  [5, 10], [0, 15], [-5, 15], [-10, 15], [-15, 25], [-20, 25],
-  [-25, 30], [-30, 25], [-35, 20], [0, 32], [5, 32], [10, 42],
-  [15, 42], [20, 38], [25, 35], [30, 32], [-5, -15], [-15, 12],
-  [-25, 28], [5, -5], [15, -5], [20, -5], [-35, 18],
-  // Asia
-  [42, 45], [45, 50], [50, 55], [55, 60], [60, 70], [65, 80],
-  [70, 90], [75, 100], [70, 140], [65, 140], [55, 135], [45, 130],
-  [35, 130], [30, 120], [25, 105], [20, 105], [10, 105], [5, 100],
-  [22, 78], [28, 85], [35, 75], [40, 70], [35, 55], [30, 50],
-  [25, 55], [15, 75], [35, 140], [43, 145], [50, 145], [55, 130],
-  [25, 121], [35, 127], [37, 127], [45, 125], [55, 110],
-  // Australia
-  [-15, 130], [-18, 125], [-22, 115], [-28, 115], [-32, 118],
-  [-35, 138], [-38, 145], [-42, 148], [-35, 150], [-28, 152],
-  [-20, 148], [-12, 132],
-];
-
 /**
  * Simplified land outlines for the header globe (Natural Earth 110m, CC0).
  * Rings are pre-ordered coast traces; do not re-sort by centroid angle.
@@ -126,3 +90,45 @@ export function isLandPoint(lat: number, lon: number): boolean {
   }
   return false;
 }
+
+function createSeededRandom(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1_664_525 + 1_013_904_223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}
+
+function sampleIrregularLandDots(
+  targetCount: number,
+  minSpacingDeg: number,
+  seed: number
+): [number, number][] {
+  const random = createSeededRandom(seed);
+  const dots: [number, number][] = [];
+  const maxAttempts = targetCount * 250;
+  let attempts = 0;
+
+  while (dots.length < targetCount && attempts < maxAttempts) {
+    attempts += 1;
+    const lat = random() * 156 - 78;
+    const lon = random() * 360 - 180;
+    if (!isLandPoint(lat, lon)) continue;
+
+    let crowded = false;
+    for (const [otherLat, otherLon] of dots) {
+      if (Math.hypot(lat - otherLat, lon - otherLon) < minSpacingDeg) {
+        crowded = true;
+        break;
+      }
+    }
+    if (crowded) continue;
+
+    dots.push([lat, lon]);
+  }
+
+  return dots;
+}
+
+/** ~150 login globe dots with irregular spacing, from the same land outlines as the header globe. */
+export const CONTINENT_DOTS = sampleIrregularLandDots(150, 2.8, 0x6c34_83);
