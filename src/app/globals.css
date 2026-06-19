@@ -62,16 +62,72 @@ button {
   stroke: rgba(108, 52, 131, 0.38);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
+  transition: stroke 450ms ease;
 }
 
 .globe-outline {
   stroke: rgba(108, 52, 131, 0.55);
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
+  transition: stroke 450ms ease;
 }
 
 .globe-dot {
   fill: rgba(108, 52, 131, 0.82);
+  transition: fill 450ms ease;
+}
+
+.login-theme-admin .globe-meridian,
+.login-theme-admin .globe-parallel {
+  stroke: rgba(255, 255, 255, 0.38);
+}
+
+.login-theme-admin .globe-outline {
+  stroke: rgba(255, 255, 255, 0.55);
+}
+
+.login-theme-admin .globe-dot {
+  fill: rgba(255, 255, 255, 0.82);
+}
+
+.login-shell {
+  --login-bg: #faf5ff;
+  background-color: var(--login-bg);
+  transition: background-color 450ms ease;
+}
+
+.login-shell.login-theme-admin {
+  --login-bg: #000000;
+}
+
+.login-panel-inner {
+  animation: login-content-in 450ms ease;
+}
+
+@keyframes login-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-shell,
+  .globe-meridian,
+  .globe-parallel,
+  .globe-outline,
+  .globe-dot {
+    transition: none;
+  }
+
+  .login-panel-inner {
+    animation: none;
+  }
 }
 
 .login-panel {

@@ -134,10 +134,10 @@ function VoteThresholds({ committee }: { committee: NonNullable<ReturnType<typeo
         Based on latest roll call ({latestRollCall.label}):
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Simple majority: {simpleMajority} votes ({votingBase} present + P&amp;V)
+        Simple majority: {simpleMajority} votes
       </span>
       <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Supermajority ⅔: {superMajority} votes ({votingBase} present + P&amp;V)
+        Supermajority ⅔: {superMajority} votes
       </span>
     </div>
   );
