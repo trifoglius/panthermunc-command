@@ -193,7 +193,7 @@ function HomeContent() {
         <p className="mt-2 text-purple-600">
           {conferenceUnavailable
             ? "This conference has been removed. Sign out to return to the login page."
-            : "Ask your conference admin to set up the conference."}
+            : "Ask your conference admin to assign you to a committee."}
         </p>
         <div className="mt-6">
           <Button variant="secondary" onClick={logout}>
