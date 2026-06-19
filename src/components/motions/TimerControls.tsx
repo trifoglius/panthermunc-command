@@ -56,15 +56,15 @@ export function TimerCard({
       {hint && <p className="mt-1 text-xs text-purple-600">{hint}</p>}
       <div className="mt-3 flex justify-center gap-2">
         {!running ? (
-          <Button size="sm" onClick={onStart} disabled={startDisabled}>
+          <Button size="md" onClick={onStart} disabled={startDisabled}>
             {startLabel}
           </Button>
         ) : (
-          <Button size="sm" variant="secondary" onClick={onPause}>
+          <Button size="md" variant="secondary" onClick={onPause}>
             Pause
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={onReset}>
+        <Button size="md" variant="ghost" onClick={onReset}>
           Reset
         </Button>
       </div>

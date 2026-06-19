@@ -6,6 +6,10 @@
   --purple-primary: #6c3483;
   --purple-dark: #5b2c6f;
   --purple-light: #e8daef;
+  --surface: #faf5ff;
+  --surface-elevated: #ffffff;
+  --border: #e8daef;
+  --header-bg: #5b2c6f;
 }
 
 @theme inline {
@@ -135,4 +139,55 @@ button {
   z-index: 10;
   transform: translateZ(0);
   isolation: isolate;
+}
+
+.table-sticky-first th:first-child,
+.table-sticky-first td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface-elevated);
+  box-shadow: 2px 0 4px -2px rgba(91, 44, 111, 0.12);
+}
+
+.table-sticky-first thead th:first-child {
+  background: var(--surface-elevated);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--purple-light) transparent;
+}
+
+.login-theme-admin {
+  --surface-elevated: #171717;
+  --border: #404040;
+  --admin-text: #f5f5f5;
+  --admin-muted: #a3a3a3;
+  --admin-input-bg: #0a0a0a;
+  --admin-input-border: #525252;
+}
+
+.login-theme-admin .admin-card {
+  border-color: var(--border);
+  background: var(--surface-elevated);
+}
+
+.login-theme-admin .admin-card label > span:first-child {
+  color: var(--admin-text);
+}
+
+.login-theme-admin .admin-card input {
+  border-color: var(--admin-input-border);
+  background: var(--admin-input-bg);
+  color: var(--admin-text);
+}
+
+.login-theme-admin .admin-card input::placeholder {
+  color: var(--admin-muted);
+}
+
+.login-theme-admin .admin-card input:focus {
+  border-color: #d4d4d4;
+  --tw-ring-color: #d4d4d4;
 }

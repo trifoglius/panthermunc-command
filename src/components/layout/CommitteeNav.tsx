@@ -2,48 +2,41 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
-import { canAccessAllCommittees, hasAnyPermission, hasPermission } from "@/lib/permissions";
-import type { Permission } from "@/lib/permissions";
-import { Button } from "@/components/ui";
+import { canAccessAllCommittees } from "@/lib/permissions";
+import { WORKSPACE_TABS, getVisibleTabs, type TabId } from "@/lib/workspace-url";
+import { Button, Select, Tabs } from "@/components/ui";
 
-const TABS = [
-  { id: "delegates", label: "Delegates", perm: "committee:operate" as const },
-  { id: "rollcall", label: "Roll Call", perm: "committee:operate" as const },
-  { id: "motions", label: "Motions", perm: "committee:operate" as const },
-  { id: "motion_queues", label: "Motion Queues", perm: "committee:operate" as const },
-  { id: "documents", label: "Documents", perm: "committee:operate" as const },
-  { id: "scoring", label: "Scoring", perm: "scoring:edit" as const },
-  { id: "stats", label: "Stats & Export", perm: "committee:operate" as const },
-  {
-    id: "rules",
-    label: "Rules of Procedure",
-    anyOf: ["committee:operate", "scoring:edit"] as Permission[],
-  },
-] as const;
-
-export type TabId = (typeof TABS)[number]["id"];
+export type { TabId };
 
 export function CommitteeNav({
   activeTab,
   onTabChange,
+  onSelectCommittee,
+  showTabs = true,
 }: {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  onSelectCommittee: (id: string) => void | Promise<void>;
+  showTabs?: boolean;
 }) {
   const { user } = useAuth();
-  const { conference, activeCommittee, selectCommittee } = useConference();
+  const { conference, activeCommittee } = useConference();
 
   if (!conference || !user) return null;
 
   const showAllCommittees = canAccessAllCommittees(user);
-  const visibleTabs = TABS.filter((tab) =>
-    "perm" in tab
-      ? hasPermission(user, tab.perm)
-      : hasAnyPermission(user, tab.anyOf)
+  const visibleIds = getVisibleTabs(user);
+  const visibleTabs = WORKSPACE_TABS.filter((t) => visibleIds.includes(t.id)).map(
+    (t) => ({ id: t.id, label: t.label })
   );
+  const useDropdown = showAllCommittees && conference.committees.length > 4;
 
   return (
-    <nav className="border-b border-purple-200 bg-purple-50">
+    <nav
+      id="committee-nav"
+      className="border-b border-purple-200 bg-purple-50"
+      aria-label="Committee navigation"
+    >
       <div className="mx-auto max-w-7xl px-4">
         <div className="flex flex-wrap items-center gap-2 py-3">
           {showAllCommittees ? (
@@ -51,18 +44,37 @@ export function CommitteeNav({
               <span className="mr-2 text-sm font-medium text-purple-800">
                 Committee:
               </span>
-              {conference.committees.map((c) => (
-                <Button
-                  key={c.id}
-                  size="sm"
-                  variant={
-                    activeCommittee?.id === c.id ? "primary" : "secondary"
-                  }
-                  onClick={() => selectCommittee(c.id)}
-                >
-                  {c.name}
-                </Button>
-              ))}
+              {useDropdown ? (
+                <Select
+                  label=""
+                  aria-label="Select committee"
+                  value={activeCommittee?.id ?? ""}
+                  onChange={(e) => {
+                    if (e.target.value) void onSelectCommittee(e.target.value);
+                  }}
+                  options={[
+                    { value: "", label: "Select committee..." },
+                    ...conference.committees.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    })),
+                  ]}
+                  className="max-w-xs"
+                />
+              ) : (
+                conference.committees.map((c) => (
+                  <Button
+                    key={c.id}
+                    size="sm"
+                    variant={
+                      activeCommittee?.id === c.id ? "primary" : "secondary"
+                    }
+                    onClick={() => void onSelectCommittee(c.id)}
+                  >
+                    {c.name}
+                  </Button>
+                ))
+              )}
             </>
           ) : (
             activeCommittee && (
@@ -72,22 +84,15 @@ export function CommitteeNav({
             )
           )}
         </div>
-        {activeCommittee && visibleTabs.length > 0 && (
+
+        {showTabs && activeCommittee && visibleTabs.length > 0 && (
           <div className="flex flex-wrap gap-1 border-t border-purple-200 py-2">
-            {visibleTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => onTabChange(tab.id)}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-purple-700 text-white"
-                    : "text-purple-800 hover:bg-purple-100"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <Tabs
+              tabs={visibleTabs}
+              activeId={activeTab}
+              onChange={(id) => onTabChange(id as TabId)}
+              ariaLabel="Workspace tabs"
+            />
           </div>
         )}
       </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
-import { Badge, Button, Card, Input } from "@/components/ui";
+import { Badge, Button, Card, Input, Select } from "@/components/ui";
 import type { RollCallStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: RollCallStatus; label: string }[] = [
@@ -21,16 +21,32 @@ export function RollCallPanel() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     activeCommittee?.rollCalls[0]?.id ?? null
   );
-
-  if (!activeCommittee) return null;
+  const [absentOnly, setAbsentOnly] = useState(false);
 
   const session =
-    activeCommittee.rollCalls.find((r) => r.id === activeSessionId) ??
-    activeCommittee.rollCalls[0];
+    activeCommittee?.rollCalls.find((r) => r.id === activeSessionId) ??
+    activeCommittee?.rollCalls[0];
+
+  const visibleDelegates = useMemo(() => {
+    if (!activeCommittee || !session) return [];
+    if (!absentOnly) return activeCommittee.delegates;
+    return activeCommittee.delegates.filter(
+      (d) => (session.attendance[d.id] ?? "absent") === "absent"
+    );
+  }, [activeCommittee, session, absentOnly]);
+
+  if (!activeCommittee) return null;
 
   const handleStart = () => {
     const id = startRollCall(label || "Roll Call");
     setActiveSessionId(id);
+  };
+
+  const markAllPresent = () => {
+    if (!session) return;
+    for (const d of activeCommittee.delegates) {
+      updateRollCallStatus(session.id, d.id, "present");
+    }
   };
 
   const presentCount = session
@@ -70,7 +86,7 @@ export function RollCallPanel() {
 
           {session && (
             <>
-              <div className="mb-4 flex flex-wrap gap-3">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
                 <Badge color={session.quorumMet ? "green" : "red"}>
                   Quorum: {session.quorumMet ? "Met" : "Not Met"}
                 </Badge>
@@ -80,10 +96,22 @@ export function RollCallPanel() {
                 <span className="text-sm text-purple-600">
                   {new Date(session.timestamp).toLocaleString()}
                 </span>
+                <Button variant="secondary" size="sm" onClick={markAllPresent}>
+                  Mark all present
+                </Button>
+                <label className="flex items-center gap-2 text-sm text-purple-800">
+                  <input
+                    type="checkbox"
+                    checked={absentOnly}
+                    onChange={(e) => setAbsentOnly(e.target.checked)}
+                    className="rounded border-purple-300 text-purple-700"
+                  />
+                  Show absent only
+                </label>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {activeCommittee.delegates.map((d) => {
+                {visibleDelegates.map((d) => {
                   const status = session.attendance[d.id] ?? "absent";
                   return (
                     <div
@@ -93,8 +121,9 @@ export function RollCallPanel() {
                       <span className="font-medium text-purple-900">
                         {d.country}
                       </span>
-                      <select
-                        className="rounded border border-purple-200 px-2 py-1 text-sm"
+                      <Select
+                        label=""
+                        aria-label={`Attendance for ${d.country}`}
                         value={status}
                         onChange={(e) =>
                           updateRollCallStatus(
@@ -103,17 +132,16 @@ export function RollCallPanel() {
                             e.target.value as RollCallStatus
                           )
                         }
-                      >
-                        {STATUS_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
+                        options={STATUS_OPTIONS}
+                        className="max-w-[10rem]"
+                      />
                     </div>
                   );
                 })}
               </div>
+              {absentOnly && visibleDelegates.length === 0 && (
+                <p className="text-sm text-green-700">All delegates are present.</p>
+              )}
             </>
           )}
         </Card>

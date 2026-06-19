@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, Input } from "@/components/ui";
+import { Button, Card, Input, LoadingScreen } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 
 function LoginForm() {
@@ -36,7 +36,7 @@ function LoginForm() {
   };
 
   if (authLoading) {
-    return <p className="text-purple-800">Loading...</p>;
+    return <LoadingScreen message="Checking session..." />;
   }
 
   return (
@@ -44,7 +44,7 @@ function LoginForm() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-purple-900">
-            PantherMUNC Conference Management System
+            PantherMUNC Command
           </h1>
           <p className="mt-1 text-sm text-purple-600">Sign in to continue</p>
         </div>
@@ -64,7 +64,11 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
             />
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && (
+              <p className="text-sm text-red-600" role="alert">
+                {error}
+              </p>
+            )}
             <Button
               type="submit"
               disabled={submitting || !username || !password}
@@ -73,20 +77,27 @@ function LoginForm() {
             </Button>
           </form>
         </Card>
+
+        <div className="mt-6 rounded-lg border border-purple-200 bg-white/80 p-4 text-center text-sm text-purple-800 backdrop-blur-sm">
+          <p className="font-medium text-purple-900">First time setup?</p>
+          <p className="mt-1 text-purple-600">
+            Initialize the admin account before signing in.
+          </p>
+          <Link
+            href="/login/admin"
+            className="mt-3 inline-block rounded-md border border-purple-300 px-4 py-2 font-medium text-purple-800 hover:bg-purple-50"
+          >
+            Admin initialization
+          </Link>
+        </div>
       </div>
-      <Link
-        href="/login/admin"
-        className="fixed bottom-4 right-4 z-20 rounded-md border border-purple-200 bg-white/90 px-3 py-1.5 text-sm text-purple-700 shadow-sm backdrop-blur-sm transition-[background-color,color,border-color] duration-[450ms] ease-in-out hover:bg-white hover:text-purple-900"
-      >
-        Admin setup
-      </Link>
     </>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<p className="text-purple-800">Loading...</p>}>
+    <Suspense fallback={<LoadingScreen message="Loading login..." />}>
       <LoginForm />
     </Suspense>
   );

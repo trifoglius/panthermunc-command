@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
 import { getRubric } from "@/lib/scoring";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import { Badge, Button, Card, Input, Select, Table, useToast } from "@/components/ui";
 import type { ScorerRole } from "@/lib/types";
 
 export function ScoringPanel() {
@@ -15,6 +15,7 @@ export function ScoringPanel() {
     updatePositionPaperScore,
     setVcRecipient,
   } = useConference();
+  const { success } = useToast();
   const [role, setRole] = useState<ScorerRole>("dais");
 
   if (!activeCommittee) return null;
@@ -28,6 +29,11 @@ export function ScoringPanel() {
     role === "judge"
       ? activeCommittee.daisScores.every((s) => s.signed)
       : activeCommittee.judgeScores.every((s) => s.signed);
+
+  const handleSign = () => {
+    signScores(role);
+    success(`${role === "judge" ? "Judge" : "Dais"} scores signed and submitted`);
+  };
 
   return (
     <div className="space-y-4">
@@ -59,7 +65,7 @@ export function ScoringPanel() {
             }
             className="max-w-xs"
           />
-          <Button onClick={() => signScores(role)}>
+          <Button onClick={handleSign}>
             Sign &amp; Submit Scoresheet
           </Button>
         </div>
@@ -69,12 +75,16 @@ export function ScoringPanel() {
             {role === "judge" ? "Judge" : "Dais"} scores signed
           </Badge>
         )}
+        {!scores.some((s) => s.signed) && otherSigned && (
+          <p className="mt-2 text-sm text-purple-600">
+            The other scorer has submitted their scoresheet.
+          </p>
+        )}
       </Card>
 
       <Card title={`${activeCommittee.type.toUpperCase()} Rubric Scoring`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
+        <Table stickyFirstColumn>
+          <thead>
               <tr className="border-b border-purple-100 text-purple-800">
                 <th className="pb-2 pr-3">Country</th>
                 {rubric.map((cat) => (
@@ -141,8 +151,7 @@ export function ScoringPanel() {
                 );
               })}
             </tbody>
-          </table>
-        </div>
+        </Table>
       </Card>
 
       <Card title="Verbal Commendation">
@@ -167,9 +176,8 @@ export function ScoringPanel() {
 
       {activeCommittee.type !== "crisis" && (
         <Card title="Position Paper Scores">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
+          <Table stickyFirstColumn>
+            <thead>
                 <tr className="border-b border-purple-100 text-purple-800">
                   <th className="pb-2 pr-4">Country</th>
                   <th className="pb-2 pr-4">PP Status</th>
@@ -221,8 +229,7 @@ export function ScoringPanel() {
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+          </Table>
         </Card>
       )}
     </div>

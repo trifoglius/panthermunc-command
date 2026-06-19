@@ -2,8 +2,19 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Input,
+  Select,
+  Table,
+  useToast,
+} from "@/components/ui";
 import type { PositionPaperStatus } from "@/lib/types";
+
+const inputClass =
+  "w-full rounded border border-purple-200 px-2 py-1 text-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500";
 
 export function DelegateManager() {
   const {
@@ -12,18 +23,31 @@ export function DelegateManager() {
     updateDelegate,
     removeDelegate,
   } = useConference();
+  const { success } = useToast();
   const [country, setCountry] = useState("");
   const [name, setName] = useState("");
   const [ppStatus, setPpStatus] = useState<PositionPaperStatus>("none");
+  const [removeId, setRemoveId] = useState<string | null>(null);
+  const [mobileView, setMobileView] = useState(false);
 
   if (!activeCommittee) return null;
+
+  const removeTarget = activeCommittee.delegates.find((d) => d.id === removeId);
 
   const handleAdd = () => {
     if (!country.trim()) return;
     addDelegate(country.trim(), name.trim(), ppStatus);
+    success(`Added ${country.trim()}`);
     setCountry("");
     setName("");
     setPpStatus("none");
+  };
+
+  const handleRemove = () => {
+    if (!removeId) return;
+    removeDelegate(removeId);
+    success(`Removed ${removeTarget?.country ?? "delegate"}`);
+    setRemoveId(null);
   };
 
   return (
@@ -63,8 +87,72 @@ export function DelegateManager() {
       </Card>
 
       <Card title={`Delegates (${activeCommittee.delegates.length})`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="mb-3 flex justify-end md:hidden">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setMobileView((v) => !v)}
+          >
+            {mobileView ? "Table view" : "Card view"}
+          </Button>
+        </div>
+
+        {mobileView ? (
+          <div className="space-y-3 md:hidden">
+            {activeCommittee.delegates.map((d) => (
+              <div
+                key={d.id}
+                className="rounded-md border border-purple-100 p-3"
+              >
+                <Input
+                  label="Country"
+                  value={d.country}
+                  onChange={(e) =>
+                    updateDelegate({ ...d, country: e.target.value })
+                  }
+                />
+                <div className="mt-2">
+                  <Input
+                    label="Delegate"
+                    value={d.delegateName}
+                    onChange={(e) =>
+                      updateDelegate({ ...d, delegateName: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="mt-2">
+                  <Select
+                    label="Position Paper"
+                    value={d.positionPaperStatus}
+                    onChange={(e) =>
+                      updateDelegate({
+                        ...d,
+                        positionPaperStatus: e.target
+                          .value as PositionPaperStatus,
+                      })
+                    }
+                    options={[
+                      { value: "none", label: "Not Submitted" },
+                      { value: "epp", label: "EPP" },
+                      { value: "lpp", label: "LPP" },
+                    ]}
+                  />
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setRemoveId(d.id)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <div className={mobileView ? "hidden md:block" : ""}>
+          <Table stickyFirstColumn>
             <thead>
               <tr className="border-b border-purple-100 text-purple-800">
                 <th className="pb-2 pr-4">Country</th>
@@ -78,8 +166,9 @@ export function DelegateManager() {
                 <tr key={d.id} className="border-b border-purple-50">
                   <td className="py-2 pr-4">
                     <input
-                      className="w-full rounded border border-purple-100 px-2 py-1"
+                      className={inputClass}
                       value={d.country}
+                      aria-label={`Country for ${d.country}`}
                       onChange={(e) =>
                         updateDelegate({ ...d, country: e.target.value })
                       }
@@ -87,8 +176,9 @@ export function DelegateManager() {
                   </td>
                   <td className="py-2 pr-4">
                     <input
-                      className="w-full rounded border border-purple-100 px-2 py-1"
+                      className={inputClass}
                       value={d.delegateName}
+                      aria-label={`Delegate name for ${d.country}`}
                       onChange={(e) =>
                         updateDelegate({ ...d, delegateName: e.target.value })
                       }
@@ -96,8 +186,9 @@ export function DelegateManager() {
                   </td>
                   <td className="py-2 pr-4">
                     <select
-                      className="rounded border border-purple-100 px-2 py-1"
+                      className={inputClass}
                       value={d.positionPaperStatus}
+                      aria-label={`Position paper for ${d.country}`}
                       onChange={(e) =>
                         updateDelegate({
                           ...d,
@@ -115,7 +206,7 @@ export function DelegateManager() {
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={() => removeDelegate(d.id)}
+                      onClick={() => setRemoveId(d.id)}
                     >
                       Remove
                     </Button>
@@ -123,14 +214,29 @@ export function DelegateManager() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
+
         {activeCommittee.delegates.length === 0 && (
           <p className="text-sm text-purple-600">
             No delegates yet. Add countries to begin committee setup.
           </p>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={!!removeId}
+        onClose={() => setRemoveId(null)}
+        onConfirm={handleRemove}
+        title="Remove delegate"
+        message={
+          <>
+            Remove <strong>{removeTarget?.country}</strong> from this committee?
+            This cannot be undone.
+          </>
+        }
+        confirmLabel="Remove"
+      />
     </div>
   );
 }

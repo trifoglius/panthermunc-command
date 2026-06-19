@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Input } from "@/components/ui";
+import { Button, Card, Input, LoadingScreen } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 
 export default function AdminBootstrapPage() {
@@ -58,7 +58,7 @@ export default function AdminBootstrapPage() {
   };
 
   if (authLoading) {
-    return <p className="text-neutral-300">Loading...</p>;
+    return <LoadingScreen message="Checking session..." />;
   }
 
   return (
@@ -71,7 +71,7 @@ export default function AdminBootstrapPage() {
           Initialize or recover the admin account
         </p>
       </div>
-      <Card className="!border-neutral-700 !bg-neutral-900 [&_input]:border-neutral-600 [&_input]:bg-neutral-950 [&_input]:text-neutral-100 [&_input]:placeholder:text-neutral-500 [&_input]:focus:border-neutral-300 [&_input]:focus:ring-neutral-300 [&_label>span]:text-neutral-200">
+      <Card className="admin-card">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -92,15 +92,23 @@ export default function AdminBootstrapPage() {
             Only conference admins with the bootstrap password can initialize
             or recover the system.
           </p>
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {info && <p className="text-sm text-green-400">{info}</p>}
-          <button
+          {error && (
+            <p className="text-sm text-red-400" role="alert">
+              {error}
+            </p>
+          )}
+          {info && (
+            <p className="text-sm text-green-400" role="status">
+              {info}
+            </p>
+          )}
+          <Button
             type="submit"
-            className="inline-flex w-full items-center justify-center rounded-md border border-neutral-200 bg-neutral-100 px-4 py-2 text-base font-medium text-neutral-900 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full border-neutral-200 bg-neutral-100 text-neutral-900 hover:bg-white"
             disabled={bootstrapping || !bootstrapPassword}
           >
             {bootstrapping ? "Initializing..." : "Initialize / Recover Admin"}
-          </button>
+          </Button>
           <Link
             href="/login"
             className="text-center text-sm text-neutral-400 underline-offset-2 hover:text-neutral-100 hover:underline"

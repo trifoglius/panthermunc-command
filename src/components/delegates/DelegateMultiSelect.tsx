@@ -31,8 +31,9 @@ export function DelegateMultiSelect({
           <button
             key={d.id}
             type="button"
+            aria-pressed={selected.includes(d.id)}
             onClick={() => onToggle(d.id)}
-            className={`rounded-full border px-3 py-1 text-sm ${
+            className={`rounded-full border px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 ${
               selected.includes(d.id)
                 ? "border-purple-700 bg-purple-700 text-white"
                 : "border-purple-200 bg-white text-purple-800"

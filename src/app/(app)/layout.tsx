@@ -1,8 +1,14 @@
+import { AppShell } from "@/components/layout/AppShell";
+import { ToastProvider } from "@/components/ui";
 import { ConferenceProvider } from "@/context/ConferenceContext";
 import type { ReactNode } from "react";
 
-// This layout wraps all authenticated pages (/, /settings, /admin/*).
-// /login lives outside this group and doesn't load conference state.
 export default function AppLayout({ children }: { children: ReactNode }) {
-  return <ConferenceProvider>{children}</ConferenceProvider>;
+  return (
+    <ConferenceProvider>
+      <ToastProvider>
+        <AppShell>{children}</AppShell>
+      </ToastProvider>
+    </ConferenceProvider>
+  );
 }

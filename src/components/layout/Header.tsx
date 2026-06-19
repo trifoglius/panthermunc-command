@@ -1,22 +1,36 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
-import { exportFullConferenceToExcel } from "@/lib/excel-export";
+import { exportConferenceLogs } from "@/lib/conference-logs-export";
+import {
+  exportCommitteeToExcel,
+  exportFullConferenceToExcel,
+} from "@/lib/excel-export";
 import { hasPermission } from "@/lib/permissions";
-import { Button, Card, Input, Select } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Input,
+  LinkButton,
+  Select,
+  useToast,
+} from "@/components/ui";
 import type { CommitteeType } from "@/lib/types";
 
 export function Header() {
   const { user, logout, authLoading } = useAuth();
   const { conference, createCommittee, activeCommittee } = useConference();
+  const { success } = useToast();
   const [showAdd, setShowAdd] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<CommitteeType>("ga");
   const [topic, setTopic] = useState("");
   const [creating, setCreating] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   const canManageConference = user ? hasPermission(user, "conference:manage") : false;
   const canManageUsers = user ? hasPermission(user, "users:manage") : false;
@@ -27,91 +41,158 @@ export function Header() {
     setCreating(true);
     try {
       await createCommittee(name.trim(), type, topic.trim(), type === "ga");
+      success(`Committee "${name.trim()}" created`);
     } finally {
       setName("");
       setTopic("");
       setCreating(false);
       setShowAdd(false);
+      setShowMobileMenu(false);
     }
   };
 
+  const handleExportCommittee = () => {
+    if (!activeCommittee) return;
+    exportCommitteeToExcel(activeCommittee);
+    success("Committee Excel exported");
+    setShowExportMenu(false);
+    setShowMobileMenu(false);
+  };
+
+  const handleExportAll = () => {
+    if (!conference) return;
+    exportFullConferenceToExcel(conference);
+    success("Full conference Excel exported");
+    setShowExportMenu(false);
+    setShowMobileMenu(false);
+  };
+
+  const handleExportLogs = () => {
+    if (!conference) return;
+    exportConferenceLogs(conference);
+    success("Conference logs exported");
+    setShowExportMenu(false);
+    setShowMobileMenu(false);
+  };
+
+  const headerBtnClass =
+    "border-white/30 bg-white text-purple-900 hover:bg-purple-50";
+
+  const actionButtons = (
+    <>
+      {canManageConference && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowAdd(!showAdd)}
+          className={headerBtnClass}
+        >
+          Add Committee
+        </Button>
+      )}
+      {conference && (canExportAll || activeCommittee) && (
+        <div className="relative" ref={exportRef}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className={headerBtnClass}
+            onClick={() => setShowExportMenu((v) => !v)}
+            aria-expanded={showExportMenu}
+            aria-haspopup="menu"
+          >
+            Export
+          </Button>
+          {showExportMenu && (
+            <div
+              role="menu"
+              className="absolute right-0 z-50 mt-1 min-w-[12rem] rounded-md border border-purple-200 bg-white py-1 shadow-lg"
+            >
+              {activeCommittee && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-4 py-2 text-left text-sm text-purple-900 hover:bg-purple-50"
+                  onClick={handleExportCommittee}
+                >
+                  Committee Excel
+                </button>
+              )}
+              {canExportAll && (
+                <>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="block w-full px-4 py-2 text-left text-sm text-purple-900 hover:bg-purple-50"
+                    onClick={handleExportAll}
+                  >
+                    Full Conference Excel
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="block w-full px-4 py-2 text-left text-sm text-purple-900 hover:bg-purple-50"
+                    onClick={handleExportLogs}
+                  >
+                    Conference Logs
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {canManageConference && (
+        <LinkButton href="/settings" variant="secondary" size="sm" className={headerBtnClass}>
+          Manage Conference
+        </LinkButton>
+      )}
+      {canManageUsers && (
+        <LinkButton href="/admin/users" variant="secondary" size="sm" className={headerBtnClass}>
+          Users
+        </LinkButton>
+      )}
+    </>
+  );
+
   return (
-    <header className="border-b border-purple-200 bg-purple-800 text-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-        <div>
-          <h1 className="text-xl font-bold">PantherMUNC Conference Management System</h1>
-          <p className="text-sm text-purple-200">
+    <header className="border-b border-purple-200 bg-[var(--header-bg)] text-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-bold md:text-xl">
+            PantherMUNC Command
+          </h1>
+          <p className="truncate text-xs text-purple-200 md:text-sm">
             {conference
               ? `${conference.name} ${conference.year}`
               : "Conference Management"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex shrink-0 items-center gap-2">
           {conference && (
-            <>
-              {canManageConference && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowAdd(!showAdd)}
-                  className="!border-white/30 !text-purple-900"
-                >
-                  Add Committee
-                </Button>
-              )}
-              {canExportAll ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => exportFullConferenceToExcel(conference)}
-                  className="!border-white/30 !text-purple-900"
-                >
-                  Export All Excel
-                </Button>
-              ) : activeCommittee ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    import("@/lib/excel-export").then(({ exportCommitteeToExcel }) =>
-                      exportCommitteeToExcel(activeCommittee)
-                    );
-                  }}
-                  className="!border-white/30 !text-purple-900"
-                >
-                  Export Excel
-                </Button>
-              ) : null}
-              {canManageConference && (
-                <Link href="/settings">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="!border-white/30 !text-purple-900"
-                  >
-                    Manage Conference
-                  </Button>
-                </Link>
-              )}
-              {canManageUsers && (
-                <Link href="/admin/users">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="!border-white/30 !text-purple-900"
-                  >
-                    Users
-                  </Button>
-                </Link>
-              )}
-            </>
+            <div className="hidden items-center gap-2 md:flex">{actionButtons}</div>
           )}
+
+          {conference && (
+            <div className="md:hidden">
+              <Button
+                variant="secondary"
+                size="sm"
+                className={headerBtnClass}
+                onClick={() => setShowMobileMenu((v) => !v)}
+                aria-expanded={showMobileMenu}
+              >
+                Actions
+              </Button>
+            </div>
+          )}
+
           {!authLoading && (
             <div
               className={`flex items-center gap-2 ${user ? "border-l border-purple-600 pl-2" : ""}`}
             >
               {user && (
-                <span className="text-xs text-purple-200">
+                <span className="hidden text-xs text-purple-200 sm:inline">
                   {user.displayName}{" "}
                   <span className="rounded bg-purple-700 px-1 py-0.5 text-purple-100">
                     {user.role}
@@ -130,6 +211,12 @@ export function Header() {
           )}
         </div>
       </div>
+
+      {showMobileMenu && conference && (
+        <div className="flex flex-wrap gap-2 border-t border-purple-700 px-4 py-3 md:hidden">
+          {actionButtons}
+        </div>
+      )}
 
       {showAdd && canManageConference && conference && (
         <div className="border-t border-purple-700 bg-white px-4 py-4 text-gray-900">

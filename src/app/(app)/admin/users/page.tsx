@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PermissionEditor } from "@/components/admin/PermissionEditor";
-import { Header } from "@/components/layout/Header";
-import { Button, Card, Input, Select } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Input,
+  LinkButton,
+  LoadingScreen,
+  Select,
+  useToast,
+} from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
@@ -46,7 +53,6 @@ function roleBadgeClass(role: UserRole) {
 }
 
 export default function AdminUsersPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const { allowed, loading: authLoading } = useRequirePermission("users:manage");
   const { conference, loading: confLoading } = useConference();
@@ -72,6 +78,8 @@ export default function AdminUsersPage() {
     Record<string, Permission[]>
   >({});
   const [savingPermissions, setSavingPermissions] = useState<string | null>(null);
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const { success, error: showError } = useToast();
 
   useEffect(() => {
     if (!allowed) return;
@@ -148,6 +156,7 @@ export default function AdminUsersPage() {
       setNewRole("chair");
       setNewPermissions(permissionsForRole("chair"));
       setNewCommitteeId("");
+      success("User created");
     } finally {
       setCreating(false);
     }
@@ -163,6 +172,9 @@ export default function AdminUsersPage() {
     if (r.ok) {
       const updated: UserRow = await r.json();
       setUsers((prev) => prev.map((u) => (u.id === uid ? updated : u)));
+      success("Committee assignment updated");
+    } else {
+      showError("Failed to update committee assignment");
     }
   };
 
@@ -182,6 +194,9 @@ export default function AdminUsersPage() {
         setUsers((prev) => prev.map((u) => (u.id === uid ? updated : u)));
         setEditRoles((prev) => ({ ...prev, [uid]: updated.role }));
         setEditPermissions((prev) => ({ ...prev, [uid]: updated.permissions }));
+        success("Permissions saved");
+      } else {
+        showError("Failed to save permissions");
       }
     } finally {
       setSavingPermissions(null);
@@ -198,14 +213,24 @@ export default function AdminUsersPage() {
     });
     if (r.ok) {
       setEditPasswords((prev) => ({ ...prev, [uid]: "" }));
+      success("Password updated");
+    } else {
+      showError("Failed to reset password");
     }
   };
 
   const handleDelete = async (uid: string) => {
-    if (!confirm("Delete this user? They will lose access immediately.")) return;
     const r = await fetch(`/api/admin/users/${uid}`, { method: "DELETE" });
-    if (r.ok) setUsers((prev) => prev.filter((u) => u.id !== uid));
+    if (r.ok) {
+      setUsers((prev) => prev.filter((u) => u.id !== uid));
+      success("User deleted");
+    } else {
+      showError("Failed to delete user");
+    }
+    setDeleteUserId(null);
   };
+
+  const deleteTarget = users.find((u) => u.id === deleteUserId);
 
   const committeeOptions = [
     { value: "", label: "— select committee —" },
@@ -216,24 +241,19 @@ export default function AdminUsersPage() {
   ];
 
   if (authLoading || confLoading || loadingUsers) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-purple-800">
-        Loading...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!allowed) return null;
 
   return (
-    <div className="min-h-screen bg-purple-50">
-      <Header />
+    <>
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-purple-900">User Management</h2>
-          <Button variant="ghost" onClick={() => router.push("/")}>
+          <LinkButton href="/" variant="ghost">
             Back to Conference
-          </Button>
+          </LinkButton>
         </div>
 
         <Card title="Add User">
@@ -397,7 +417,7 @@ export default function AdminUsersPage() {
                         <Button
                           variant="danger"
                           size="sm"
-                          onClick={() => handleDelete(u.id)}
+                          onClick={() => setDeleteUserId(u.id)}
                         >
                           Delete
                         </Button>
@@ -410,6 +430,22 @@ export default function AdminUsersPage() {
           )}
         </Card>
       </div>
-    </div>
+
+      <ConfirmDialog
+        open={!!deleteUserId}
+        onClose={() => setDeleteUserId(null)}
+        onConfirm={() => {
+          if (deleteUserId) void handleDelete(deleteUserId);
+        }}
+        title="Delete user"
+        message={
+          <>
+            Delete <strong>{deleteTarget?.displayName}</strong>? They will lose
+            access immediately.
+          </>
+        }
+        confirmLabel="Delete"
+      />
+    </>
   );
 }

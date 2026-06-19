@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
-import { exportCommitteeToExcel } from "@/lib/excel-export";
 import { buildDelegateStats, getAwardPreview } from "@/lib/scoring";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import { Badge, Button, Card, Input, Select, Table, useToast } from "@/components/ui";
 
 export function StatsPanel() {
   const { activeCommittee, addSpeakingEvent } = useConference();
+  const { success } = useToast();
   const [speakerId, setSpeakerId] = useState("");
   const [eventType, setEventType] = useState("gsl");
   const [duration, setDuration] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (!activeCommittee) return null;
 
@@ -24,16 +25,16 @@ export function StatsPanel() {
       eventType,
       durationSeconds: duration ? Number(duration) : undefined,
     });
+    success("Speaking event logged");
     setDuration("");
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={() => exportCommitteeToExcel(activeCommittee)}>
-          Export Committee to Excel
-        </Button>
-      </div>
+      <p className="text-sm text-purple-700">
+        Awards preview and delegate statistics. Export committee or conference
+        data from the Export menu in the header.
+      </p>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Awards Preview">
@@ -147,18 +148,64 @@ export function StatsPanel() {
       </Card>
 
       <Card title="Delegate Statistics">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+        <div className="space-y-3 md:hidden">
+          {stats.map((s) => (
+            <div
+              key={s.delegateId}
+              className="rounded-md border border-purple-100 p-3 text-sm"
+            >
+              <button
+                type="button"
+                className="flex w-full items-center justify-between text-left"
+                onClick={() =>
+                  setExpandedId((id) =>
+                    id === s.delegateId ? null : s.delegateId
+                  )
+                }
+              >
+                <span className="font-medium text-purple-900">
+                  #{s.rank ?? "—"} {s.country}
+                </span>
+                <span className="font-semibold text-purple-700">
+                  {s.compositeScore?.toFixed(1) ?? "—"}
+                </span>
+              </button>
+              {expandedId === s.delegateId && (
+                <dl className="mt-2 grid grid-cols-2 gap-1 text-xs text-purple-700">
+                  <dt>Speeches</dt>
+                  <dd>{s.speeches}</dd>
+                  <dt>Time (s)</dt>
+                  <dd>{s.totalSpeakingSeconds}</dd>
+                  <dt>Motions</dt>
+                  <dd>{s.motionsProposed}</dd>
+                  <dt>Sponsored</dt>
+                  <dd>{s.documentsSponsored}</dd>
+                  <dt>Signed</dt>
+                  <dd>{s.documentsSigned}</dd>
+                  <dt>Points</dt>
+                  <dd>{s.pointsRaised}</dd>
+                  <dt>Judge</dt>
+                  <dd>{s.judgeScore ?? "—"}</dd>
+                  <dt>Dais</dt>
+                  <dd>{s.daisScore ?? "—"}</dd>
+                </dl>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block">
+          <Table stickyFirstColumn compact>
             <thead>
               <tr className="border-b border-purple-100 text-purple-800">
                 <th className="pb-2 pr-3">Rank</th>
                 <th className="pb-2 pr-3">Country</th>
-                <th className="pb-2 pr-3">Speeches</th>
-                <th className="pb-2 pr-3">Time (s)</th>
-                <th className="pb-2 pr-3">Motions</th>
-                <th className="pb-2 pr-3">Sponsored</th>
-                <th className="pb-2 pr-3">Signed</th>
-                <th className="pb-2 pr-3">Points</th>
+                <th className="hidden pb-2 pr-3 lg:table-cell">Speeches</th>
+                <th className="hidden pb-2 pr-3 lg:table-cell">Time (s)</th>
+                <th className="hidden pb-2 pr-3 xl:table-cell">Motions</th>
+                <th className="hidden pb-2 pr-3 xl:table-cell">Sponsored</th>
+                <th className="hidden pb-2 pr-3 xl:table-cell">Signed</th>
+                <th className="hidden pb-2 pr-3 xl:table-cell">Points</th>
                 <th className="pb-2 pr-3">Judge</th>
                 <th className="pb-2 pr-3">Dais</th>
                 <th className="pb-2 pr-3">Composite</th>
@@ -170,12 +217,22 @@ export function StatsPanel() {
                 <tr key={s.delegateId} className="border-b border-purple-50">
                   <td className="py-2 pr-3">{s.rank ?? "—"}</td>
                   <td className="py-2 pr-3 font-medium">{s.country}</td>
-                  <td className="py-2 pr-3">{s.speeches}</td>
-                  <td className="py-2 pr-3">{s.totalSpeakingSeconds}</td>
-                  <td className="py-2 pr-3">{s.motionsProposed}</td>
-                  <td className="py-2 pr-3">{s.documentsSponsored}</td>
-                  <td className="py-2 pr-3">{s.documentsSigned}</td>
-                  <td className="py-2 pr-3">{s.pointsRaised}</td>
+                  <td className="hidden py-2 pr-3 lg:table-cell">{s.speeches}</td>
+                  <td className="hidden py-2 pr-3 lg:table-cell">
+                    {s.totalSpeakingSeconds}
+                  </td>
+                  <td className="hidden py-2 pr-3 xl:table-cell">
+                    {s.motionsProposed}
+                  </td>
+                  <td className="hidden py-2 pr-3 xl:table-cell">
+                    {s.documentsSponsored}
+                  </td>
+                  <td className="hidden py-2 pr-3 xl:table-cell">
+                    {s.documentsSigned}
+                  </td>
+                  <td className="hidden py-2 pr-3 xl:table-cell">
+                    {s.pointsRaised}
+                  </td>
                   <td className="py-2 pr-3">{s.judgeScore ?? "—"}</td>
                   <td className="py-2 pr-3">{s.daisScore ?? "—"}</td>
                   <td className="py-2 pr-3 font-semibold">
@@ -189,7 +246,7 @@ export function StatsPanel() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       </Card>
     </div>

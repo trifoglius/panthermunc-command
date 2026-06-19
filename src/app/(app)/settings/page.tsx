@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { Badge, Button, Card, Input, Select } from "@/components/ui";
+import { useMemo, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  Input,
+  LinkButton,
+  LoadingScreen,
+  Select,
+  useToast,
+} from "@/components/ui";
 import { useConference } from "@/context/ConferenceContext";
 import { usePolling } from "@/hooks/usePolling";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
@@ -172,7 +180,6 @@ function NotifyChairsCard({ committees }: { committees: Committee[] }) {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
   const { allowed, loading: authLoading } = useRequirePermission("conference:manage");
   const {
     conference,
@@ -193,15 +200,24 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [showDelete, setShowDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [confirmTypeChangeId, setConfirmTypeChangeId] = useState<string | null>(
+    null
+  );
+  const { success } = useToast();
 
   usePolling(loadAllCommitteeData, COMMITTEE_POLL_MS, !loading && !!conference);
 
+  const hasUnsavedCommittees = useMemo(
+    () =>
+      (conference?.committees ?? []).some((c) =>
+        committeeDraftChanged(c, getCommitteeDraft(c, committeeDrafts))
+      ),
+    [conference?.committees, committeeDrafts]
+  );
+
   if (authLoading || loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-purple-800">
-        Loading...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!allowed || !conference) return null;
@@ -214,7 +230,12 @@ export default function SettingsPage() {
     setDraftName(null);
     setDraftYear(null);
     setSaving(false);
+    success("Conference details saved");
   };
+
+  const hasUnsavedConferenceDetails =
+    (draftName !== null && draftName !== conference.name) ||
+    (draftYear !== null && draftYear !== conference.year);
 
   const handleSaveCommittee = async (id: string) => {
     const committee = conference.committees.find((c) => c.id === id);
@@ -227,12 +248,13 @@ export default function SettingsPage() {
 
     if (
       draft.type !== committee.type &&
-      !confirm(
-        "Changing committee type resets rubric scores to match the new scoring model. Notes are kept. Continue?"
-      )
+      confirmTypeChangeId !== id
     ) {
+      setConfirmTypeChangeId(id);
       return;
     }
+
+    setConfirmTypeChangeId(null);
 
     setSavingCommitteeId(id);
     try {
@@ -246,6 +268,7 @@ export default function SettingsPage() {
         delete next[id];
         return next;
       });
+      success("Committee settings saved");
     } finally {
       setSavingCommitteeId(null);
     }
@@ -263,22 +286,14 @@ export default function SettingsPage() {
   };
 
   const handleRemoveCommittee = async (id: string) => {
-    if (conference.committees.length <= 1) {
-      if (
-        !confirm(
-          "This is the last committee. Removing it will return you to setup. Continue?"
-        )
-      )
-        return;
-    } else if (
-      !confirm(
-        "Remove this committee and all of its data? This cannot be undone."
-      )
-    ) {
-      return;
-    }
     await removeCommittee(id);
+    success("Committee removed");
+    setConfirmRemoveId(null);
   };
+
+  const removeTarget = conference.committees.find(
+    (c) => c.id === confirmRemoveId
+  );
 
   const handleDeleteConference = async () => {
     if (deleteConfirm !== conference.name) return;
@@ -286,16 +301,21 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-purple-50">
-      <Header />
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-purple-900">
-            Manage Conference
-          </h2>
-          <Button variant="ghost" onClick={() => router.push("/")}>
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-900">
+              Manage Conference
+            </h2>
+            {(hasUnsavedConferenceDetails || hasUnsavedCommittees) && (
+              <div className="mt-1">
+                <Badge color="yellow">Unsaved changes</Badge>
+              </div>
+            )}
+          </div>
+          <LinkButton href="/" variant="ghost">
             Back to Conference
-          </Button>
+          </LinkButton>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -384,7 +404,7 @@ export default function SettingsPage() {
                           <Button
                             variant="danger"
                             size="sm"
-                            onClick={() => handleRemoveCommittee(c.id)}
+                            onClick={() => setConfirmRemoveId(c.id)}
                           >
                             Remove
                           </Button>
@@ -399,11 +419,15 @@ export default function SettingsPage() {
             <Card title="Export Logs">
               <p className="mb-3 text-sm text-purple-700">
                 Download all motions, speaking events, points, and roll call
-                records across every committee.
+                records across every committee. Also available from the header
+                Export menu.
               </p>
               <Button
                 variant="secondary"
-                onClick={() => exportConferenceLogs(conference)}
+                onClick={() => {
+                  exportConferenceLogs(conference);
+                  success("Conference logs exported");
+                }}
               >
                 Export All Conference Logs
               </Button>
@@ -455,7 +479,42 @@ export default function SettingsPage() {
             </Card>
           </div>
         </div>
-      </div>
+
+      <ConfirmDialog
+        open={!!confirmRemoveId}
+        onClose={() => setConfirmRemoveId(null)}
+        onConfirm={() => {
+          if (confirmRemoveId) void handleRemoveCommittee(confirmRemoveId);
+        }}
+        title="Remove committee"
+        message={
+          conference.committees.length <= 1 ? (
+            <>
+              This is the last committee. Removing{" "}
+              <strong>{removeTarget?.name}</strong> will return you to setup.
+              Continue?
+            </>
+          ) : (
+            <>
+              Remove <strong>{removeTarget?.name}</strong> and all of its data?
+              This cannot be undone.
+            </>
+          )
+        }
+        confirmLabel="Remove"
+      />
+
+      <ConfirmDialog
+        open={!!confirmTypeChangeId}
+        onClose={() => setConfirmTypeChangeId(null)}
+        onConfirm={() => {
+          if (confirmTypeChangeId) void handleSaveCommittee(confirmTypeChangeId);
+        }}
+        title="Change committee type"
+        message="Changing committee type resets rubric scores to match the new scoring model. Notes are kept. Continue?"
+        confirmLabel="Change type"
+        variant="primary"
+      />
     </div>
   );
 }

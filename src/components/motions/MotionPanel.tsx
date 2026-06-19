@@ -11,7 +11,7 @@ import { motionHasActiveSession } from "@/lib/motion-timers";
 import { parseDocumentOrder } from "@/lib/voting";
 import { isActiveDraftResolution, getSubmissionOrderIds } from "@/lib/documents";
 import type { MotionField } from "@/lib/constants";
-import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Input, Select, Tabs, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
 
 export function MotionPanel() {
@@ -26,6 +26,10 @@ export function MotionPanel() {
   const [details, setDetails] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [activeMotionId, setActiveMotionId] = useState<string | null>(null);
+  const [sessionMinimized, setSessionMinimized] = useState(false);
+  const [motionSection, setMotionSection] = useState<"motions" | "points">(
+    "motions"
+  );
 
   if (!activeCommittee) return null;
 
@@ -94,16 +98,17 @@ export function MotionPanel() {
     }
 
     if (field.type === "select") {
+      const fieldOptions = field.options ?? [];
+      const hasEmptyOption = fieldOptions.some((o) => o.value === "");
       const options =
         field.key === "vote_manner"
           ? [
               { value: "", label: "Select..." },
               ...VOTE_MANNERS.map((v) => ({ value: v, label: v })),
             ]
-          : [
-              { value: "", label: "Select..." },
-              ...(field.options ?? []),
-            ];
+          : hasEmptyOption
+            ? fieldOptions
+            : [{ value: "", label: "Select..." }, ...fieldOptions];
 
       return (
         <Select
@@ -160,6 +165,7 @@ export function MotionPanel() {
     updateMotion(updated);
     if (status === "passed" && motionHasActiveSession(updated)) {
       setActiveMotionId(motion.id);
+      setSessionMinimized(false);
     }
   };
 
@@ -178,16 +184,48 @@ export function MotionPanel() {
     setActiveMotionId(null);
   };
 
-  return (
-    <div className="space-y-4">
-      {activeMotion && activeMotion.status === "passed" && (
-        <MotionActiveSession
-          motion={activeMotion}
-          onDismiss={() => setActiveMotionId(null)}
-        />
-      )}
+  const hasActiveSession =
+    !!activeMotion && activeMotion.status === "passed";
 
-      <Card title="Propose Motion">
+  const sessionPanel =
+    hasActiveSession &&
+    (sessionMinimized ? (
+      <div className="flex items-center justify-between rounded-lg border border-purple-400 bg-purple-100 px-4 py-2">
+        <span className="text-sm font-medium text-purple-900">
+          Active session: {activeMotion.type}
+        </span>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setSessionMinimized(false)}
+        >
+          Expand session
+        </Button>
+      </div>
+    ) : (
+      <MotionActiveSession
+        motion={activeMotion}
+        onDismiss={() => setSessionMinimized(true)}
+      />
+    ));
+
+  const panelBody = (
+    <>
+      <Tabs
+        tabs={[
+          { id: "motions", label: "Motions" },
+          { id: "points", label: "Points" },
+        ]}
+        activeId={motionSection}
+        onChange={(id) => setMotionSection(id as "motions" | "points")}
+        ariaLabel="Motions section"
+      />
+
+      {motionSection === "points" ? (
+        <PointsPanel />
+      ) : (
+        <>
+          <Card title="Propose Motion">
         <div className="grid gap-3 md:grid-cols-2">
           <Select
             label="Motion Type"
@@ -263,14 +301,24 @@ export function MotionPanel() {
                 isActive={activeMotionId === motion.id}
                 onStatusChange={handleStatusChange}
                 onUpdate={updateMotion}
-                onOpenSession={() => setActiveMotionId(motion.id)}
+                onOpenSession={() => {
+                  setActiveMotionId(motion.id);
+                  setSessionMinimized(false);
+                }}
               />
             ))}
           </div>
         )}
       </Card>
+        </>
+      )}
+    </>
+  );
 
-      <PointsPanel />
+  return (
+    <div className="space-y-4">
+      {hasActiveSession ? sessionPanel : null}
+      {panelBody}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function MotionActiveSession({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <Badge color="green">Passed</Badge>
         <Button variant="ghost" size="sm" onClick={onDismiss}>
-          Dismiss
+          Minimize
         </Button>
       </div>
       {config && <MotionActiveSessionBody motion={motion} config={config} />}
