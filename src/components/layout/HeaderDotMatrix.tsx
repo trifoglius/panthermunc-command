@@ -6,7 +6,7 @@ import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 const DOT_SPACING = 14;
 const DOT_SIZE = 1.75;
 const EVENT_PULSE_MS = 1100;
-const EVENT_BOOST_MAX = 0.36;
+const EVENT_BOOST_MAX = 0.5;
 /** Normalized ambient cycle (0–1); only dots above this join the event flash. */
 const FLASH_CYCLE_THRESHOLD = 0.62;
 
@@ -105,8 +105,8 @@ export function HeaderDotMatrix() {
           (reducedMotion || cycle >= FLASH_CYCLE_THRESHOLD);
         const dotBoost = qualifiesForFlash ? eventBoost : 0;
 
-        const pulse = Math.min(0.82, ambient + dotBoost);
-        const size = DOT_SIZE + dotBoost * 1.1;
+        const pulse = Math.min(0.92, ambient + dotBoost);
+        const size = DOT_SIZE + dotBoost * 1.35;
         const half = size / 2;
         ctx.fillStyle = `rgba(255, 255, 255, ${pulse})`;
         ctx.fillRect(dot.x - half, dot.y - half, size, size);
