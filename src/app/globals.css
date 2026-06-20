@@ -172,6 +172,50 @@ button {
   vector-effect: non-scaling-stroke;
 }
 
+@keyframes globe-flash-stroke-grid {
+  0%,
+  100% {
+    stroke-width: 0.46;
+  }
+
+  40% {
+    stroke-width: 0.94;
+  }
+}
+
+@keyframes globe-flash-stroke-outline {
+  0%,
+  100% {
+    stroke-width: 0.44;
+  }
+
+  40% {
+    stroke-width: 0.9;
+  }
+}
+
+@keyframes globe-flash-stroke-rim {
+  0%,
+  100% {
+    stroke-width: 0.48;
+  }
+
+  40% {
+    stroke-width: 0.98;
+  }
+}
+
+@keyframes globe-flash-stroke-continent {
+  0%,
+  100% {
+    stroke-width: 0.42;
+  }
+
+  40% {
+    stroke-width: 0.86;
+  }
+}
+
 @keyframes globe-flash-green-grid {
   0%,
   100% {
@@ -240,15 +284,21 @@ button {
 
 .header-globe-scene.globe-flash-pass .globe-meridian,
 .header-globe-scene.globe-flash-pass .globe-parallel {
-  animation: globe-flash-green-grid 1100ms ease-in-out;
+  animation:
+    globe-flash-green-grid 1100ms ease-in-out,
+    globe-flash-stroke-grid 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-pass .globe-outline {
-  animation: globe-flash-green-outline 1100ms ease-in-out;
+  animation:
+    globe-flash-green-outline 1100ms ease-in-out,
+    globe-flash-stroke-outline 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-pass .globe-rim {
-  animation: globe-flash-green-rim 1100ms ease-in-out;
+  animation:
+    globe-flash-green-rim 1100ms ease-in-out,
+    globe-flash-stroke-rim 1100ms ease-in-out;
 }
 
 @keyframes globe-flash-green-continent {
@@ -263,20 +313,28 @@ button {
 }
 
 .header-globe-scene.globe-flash-pass .globe-continent {
-  animation: globe-flash-green-continent 1100ms ease-in-out;
+  animation:
+    globe-flash-green-continent 1100ms ease-in-out,
+    globe-flash-stroke-continent 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-fail .globe-meridian,
 .header-globe-scene.globe-flash-fail .globe-parallel {
-  animation: globe-flash-red-grid 1100ms ease-in-out;
+  animation:
+    globe-flash-red-grid 1100ms ease-in-out,
+    globe-flash-stroke-grid 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-fail .globe-outline {
-  animation: globe-flash-red-outline 1100ms ease-in-out;
+  animation:
+    globe-flash-red-outline 1100ms ease-in-out,
+    globe-flash-stroke-outline 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-fail .globe-rim {
-  animation: globe-flash-red-rim 1100ms ease-in-out;
+  animation:
+    globe-flash-red-rim 1100ms ease-in-out,
+    globe-flash-stroke-rim 1100ms ease-in-out;
 }
 
 @keyframes globe-flash-red-continent {
@@ -291,7 +349,9 @@ button {
 }
 
 .header-globe-scene.globe-flash-fail .globe-continent {
-  animation: globe-flash-red-continent 1100ms ease-in-out;
+  animation:
+    globe-flash-red-continent 1100ms ease-in-out,
+    globe-flash-stroke-continent 1100ms ease-in-out;
 }
 
 @keyframes globe-flash-blue-grid {
@@ -362,15 +422,21 @@ button {
 
 .header-globe-scene.globe-flash-notification .globe-meridian,
 .header-globe-scene.globe-flash-notification .globe-parallel {
-  animation: globe-flash-blue-grid 1100ms ease-in-out;
+  animation:
+    globe-flash-blue-grid 1100ms ease-in-out,
+    globe-flash-stroke-grid 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-notification .globe-outline {
-  animation: globe-flash-blue-outline 1100ms ease-in-out;
+  animation:
+    globe-flash-blue-outline 1100ms ease-in-out,
+    globe-flash-stroke-outline 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-notification .globe-rim {
-  animation: globe-flash-blue-rim 1100ms ease-in-out;
+  animation:
+    globe-flash-blue-rim 1100ms ease-in-out,
+    globe-flash-stroke-rim 1100ms ease-in-out;
 }
 
 @keyframes globe-flash-blue-continent {
@@ -385,20 +451,28 @@ button {
 }
 
 .header-globe-scene.globe-flash-notification .globe-continent {
-  animation: globe-flash-blue-continent 1100ms ease-in-out;
+  animation:
+    globe-flash-blue-continent 1100ms ease-in-out,
+    globe-flash-stroke-continent 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-timer .globe-meridian,
 .header-globe-scene.globe-flash-timer .globe-parallel {
-  animation: globe-flash-yellow-grid 1100ms ease-in-out;
+  animation:
+    globe-flash-yellow-grid 1100ms ease-in-out,
+    globe-flash-stroke-grid 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-timer .globe-outline {
-  animation: globe-flash-yellow-outline 1100ms ease-in-out;
+  animation:
+    globe-flash-yellow-outline 1100ms ease-in-out,
+    globe-flash-stroke-outline 1100ms ease-in-out;
 }
 
 .header-globe-scene.globe-flash-timer .globe-rim {
-  animation: globe-flash-yellow-rim 1100ms ease-in-out;
+  animation:
+    globe-flash-yellow-rim 1100ms ease-in-out,
+    globe-flash-stroke-rim 1100ms ease-in-out;
 }
 
 @keyframes globe-flash-yellow-continent {
@@ -413,7 +487,9 @@ button {
 }
 
 .header-globe-scene.globe-flash-timer .globe-continent {
-  animation: globe-flash-yellow-continent 1100ms ease-in-out;
+  animation:
+    globe-flash-yellow-continent 1100ms ease-in-out,
+    globe-flash-stroke-continent 1100ms ease-in-out;
 }
 
 .login-shell {

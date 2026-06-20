@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { playAlarmSound, unlockAlarmSound } from "@/lib/alarm-sound";
+import {
+  onTimerStartWarning,
+  onTimerTickWarning,
+} from "@/lib/timer-flash";
 
 export function useCountdown(initialSeconds: number) {
   const { triggerFlash } = useHeaderGlobeFlash();
@@ -32,8 +36,9 @@ export function useCountdown(initialSeconds: number) {
 
   const start = useCallback(() => {
     unlockAlarmSound();
+    onTimerStartWarning(secondsRef.current, triggerFlash);
     setRunning(true);
-  }, []);
+  }, [triggerFlash]);
   const pause = useCallback(() => setRunning(false), []);
 
   useEffect(() => {
@@ -44,21 +49,19 @@ export function useCountdown(initialSeconds: number) {
 
     intervalRef.current = setInterval(() => {
       const current = secondsRef.current;
-      if (current <= 1) {
-        clear();
-        setRunning(false);
-        secondsRef.current = 0;
-        setSeconds(0);
-        if (current > 0) {
-          triggerFlash("timer");
-          playAlarmSound();
-        }
-        return;
-      }
+      if (current <= 0) return;
 
       const next = current - 1;
       secondsRef.current = next;
       setSeconds(next);
+
+      onTimerTickWarning(current, next, triggerFlash);
+
+      if (next === 0) {
+        clear();
+        setRunning(false);
+        playAlarmSound();
+      }
     }, 1000);
 
     return clear;

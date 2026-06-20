@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { playAlarmSound, unlockAlarmSound } from "@/lib/alarm-sound";
+import {
+  onTimerStartWarning,
+  TIMER_WARNING_SECONDS,
+} from "@/lib/timer-flash";
 
 export type TimerMode = "none" | "total" | "speaking";
 
@@ -57,25 +61,29 @@ export function useSessionTimers(
 
   const startTotal = useCallback(() => {
     unlockAlarmSound();
+    onTimerStartWarning(totalRef.current, triggerFlash);
     setMode("total");
-  }, []);
+  }, [triggerFlash]);
 
   const startSpeaking = useCallback(() => {
     unlockAlarmSound();
+    onTimerStartWarning(speakingRef.current, triggerFlash);
     setMode("speaking");
-  }, []);
+  }, [triggerFlash]);
 
   useEffect(() => {
     clear();
     if (mode === "none") return;
 
     intervalRef.current = setInterval(() => {
-      let expired = false;
+      let shouldFlash = false;
+      let shouldAlarm = false;
 
       if ((mode === "total" || mode === "speaking") && totalInitial > 0) {
         const current = totalRef.current;
         const next = Math.max(0, current - 1);
-        if (next === 0 && current > 0) expired = true;
+        if (current > 0 && next <= TIMER_WARNING_SECONDS) shouldFlash = true;
+        if (next === 0 && current > 0) shouldAlarm = true;
         totalRef.current = next;
         setTotalSeconds(next);
         if (next === 0) {
@@ -87,7 +95,8 @@ export function useSessionTimers(
       if (mode === "speaking") {
         const current = speakingRef.current;
         const next = Math.max(0, current - 1);
-        if (next === 0 && current > 0) expired = true;
+        if (current > 0 && next <= TIMER_WARNING_SECONDS) shouldFlash = true;
+        if (next === 0 && current > 0) shouldAlarm = true;
         speakingRef.current = next;
         setSpeakingSeconds(next);
         if (next === 0) {
@@ -96,10 +105,8 @@ export function useSessionTimers(
         }
       }
 
-      if (expired) {
-        triggerFlash("timer");
-        playAlarmSound();
-      }
+      if (shouldFlash) triggerFlash("timer");
+      if (shouldAlarm) playAlarmSound();
     }, 1000);
 
     return clear;
