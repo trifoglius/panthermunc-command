@@ -7,6 +7,7 @@ import {
   addSpeakerWithReserve,
   applySpeakOrderReserve,
   formatTime,
+  getMotionTypeId,
   type MotionTimerConfig,
 } from "@/lib/motion-timers";
 import type { Motion } from "@/lib/types";
@@ -20,8 +21,12 @@ interface SpeakerQueueProps {
 }
 
 export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
-  const { activeCommittee, addSpeakingEvent, setMotionSpeakerQueue } =
-    useConference();
+  const {
+    activeCommittee,
+    addSpeakingEvent,
+    setMotionSpeakerQueue,
+    updateMotion,
+  } = useConference();
   const savedQueue =
     activeCommittee?.motionSessionState?.[motion.id]?.speakerQueue ?? [];
   const initialQueue =
@@ -44,6 +49,12 @@ export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
 
   if (!activeCommittee) return null;
 
+  const motionTypeId = getMotionTypeId(motion);
+  const showSpeakOrder = motionTypeId === "moderated_caucus";
+  const speakOrder = motion.details.speak_order ?? "";
+  const proposer = activeCommittee.delegates.find(
+    (d) => d.id === motion.proposedBy
+  );
   const speakingSeconds = timers.speakingInitial;
   const pendingIds = queue.slice(currentIndex);
   const available = activeCommittee.delegates.filter(
@@ -91,6 +102,67 @@ export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
     }
   };
 
+  const setSpeakOrder = (value: string) => {
+    const nextDetails = { ...motion.details };
+    if (value) nextDetails.speak_order = value;
+    else delete nextDetails.speak_order;
+    updateMotion({ ...motion, details: nextDetails });
+    updateQueue(
+      applySpeakOrderReserve(
+        queue,
+        motion.proposedBy,
+        value || undefined,
+        currentIndex
+      )
+    );
+  };
+
+  const currentSpeakerControls =
+    currentSpeakerId && currentIndex < queue.length ? (
+      <div className="mb-4 rounded-lg border border-purple-300 bg-white p-4">
+        <p className="text-sm text-purple-700">
+          Current:{" "}
+          <strong>
+            {
+              activeCommittee.delegates.find((d) => d.id === currentSpeakerId)
+                ?.country
+            }
+          </strong>{" "}
+          · {formatTime(timers.speakingSeconds)} speaking remaining
+          {timers.hasTotal && (
+            <> · {formatTime(timers.totalSeconds)} caucus remaining</>
+          )}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {timers.mode !== "speaking" ? (
+            <Button size="sm" onClick={timers.startSpeaking}>
+              Start Speaking Timer
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={timers.pause}>
+              Pause
+            </Button>
+          )}
+          <Button size="sm" onClick={completeSpeech}>
+            Complete &amp; Log Speech
+          </Button>
+          <Button size="sm" variant="ghost" onClick={skipSpeaker}>
+            Skip
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              timers.pause();
+              timers.resetSpeaking();
+            }}
+          >
+            Reset Speaking
+          </Button>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div className="mt-4 border-t border-purple-100 pt-4">
       <h4 className="mb-3 font-semibold text-purple-900">Speaker List</h4>
@@ -100,6 +172,24 @@ export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
           Caucus total remaining: {formatTime(timers.totalSeconds)}
         </p>
       )}
+
+      {showSpeakOrder && (
+        <div className="mb-4">
+          <Select
+            label={`Does ${proposer?.country ?? "the proposer"} want to speak first or last?`}
+            value={speakOrder}
+            onChange={(e) => setSpeakOrder(e.target.value)}
+            options={[
+              { value: "", label: "Not reserved" },
+              { value: "first", label: "Speak first" },
+              { value: "last", label: "Speak last" },
+            ]}
+            className="max-w-md"
+          />
+        </div>
+      )}
+
+      {currentSpeakerControls}
 
       <div className="mb-3 flex flex-wrap items-end gap-2">
         <Select
@@ -169,48 +259,6 @@ export function SpeakerQueue({ motion, config, timers }: SpeakerQueueProps) {
             );
           })}
         </ol>
-      )}
-
-      {currentSpeakerId && currentIndex < queue.length && (
-        <div className="mt-4 rounded-lg border border-purple-300 bg-white p-4">
-          <p className="text-sm text-purple-700">
-            Current:{" "}
-            <strong>
-              {activeCommittee.delegates.find((d) => d.id === currentSpeakerId)?.country}
-            </strong>{" "}
-            · {formatTime(timers.speakingSeconds)} speaking remaining
-            {timers.hasTotal && (
-              <> · {formatTime(timers.totalSeconds)} caucus remaining</>
-            )}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {timers.mode !== "speaking" ? (
-              <Button size="sm" onClick={timers.startSpeaking}>
-                Start Speaking Timer
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={timers.pause}>
-                Pause
-              </Button>
-            )}
-            <Button size="sm" onClick={completeSpeech}>
-              Complete &amp; Log Speech
-            </Button>
-            <Button size="sm" variant="ghost" onClick={skipSpeaker}>
-              Skip
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                timers.pause();
-                timers.resetSpeaking();
-              }}
-            >
-              Reset Speaking
-            </Button>
-          </div>
-        </div>
       )}
     </div>
   );

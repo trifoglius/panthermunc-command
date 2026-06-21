@@ -108,6 +108,53 @@ export function VotingSpeakerQueue({
     }
   };
 
+  const currentSpeakerControls =
+    currentSpeakerId && currentIndex < combinedQueue.length ? (
+      <div className="mb-4 rounded-lg border border-purple-300 bg-white p-4">
+        <p className="text-sm text-purple-700">
+          Current:{" "}
+          <strong>
+            {
+              activeCommittee.delegates.find((d) => d.id === currentSpeakerId)
+                ?.country
+            }
+          </strong>{" "}
+          ({speakerSide(currentSpeakerId)}) ·{" "}
+          {formatTime(timers.speakingSeconds)} speaking remaining
+          {timers.hasTotal && (
+            <> · {formatTime(timers.totalSeconds)} period remaining</>
+          )}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {timers.mode !== "speaking" ? (
+            <Button size="sm" onClick={timers.startSpeaking}>
+              Start Speaking Timer
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={timers.pause}>
+              Pause
+            </Button>
+          )}
+          <Button size="sm" onClick={completeSpeech}>
+            Complete &amp; Log Speech
+          </Button>
+          <Button size="sm" variant="ghost" onClick={skipSpeaker}>
+            Skip
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              timers.pause();
+              timers.resetSpeaking();
+            }}
+          >
+            Reset Speaking
+          </Button>
+        </div>
+      </div>
+    ) : null;
+
   const renderSideList = (
     title: string,
     side: "for" | "against",
@@ -203,53 +250,12 @@ export function VotingSpeakerQueue({
         </p>
       )}
 
+      {currentSpeakerControls}
+
       <div className="grid gap-4 md:grid-cols-2">
         {renderSideList("Speakers For", "for", speakersFor, addForId, setAddForId, "green")}
         {renderSideList("Speakers Against", "against", speakersAgainst, addAgainstId, setAddAgainstId, "red")}
       </div>
-
-      {currentSpeakerId && currentIndex < combinedQueue.length && (
-        <div className="mt-4 rounded-lg border border-purple-300 bg-white p-4">
-          <p className="text-sm text-purple-700">
-            Current:{" "}
-            <strong>
-              {activeCommittee.delegates.find((d) => d.id === currentSpeakerId)?.country}
-            </strong>{" "}
-            ({speakerSide(currentSpeakerId)}) ·{" "}
-            {formatTime(timers.speakingSeconds)} speaking remaining
-            {timers.hasTotal && (
-              <> · {formatTime(timers.totalSeconds)} period remaining</>
-            )}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {timers.mode !== "speaking" ? (
-              <Button size="sm" onClick={timers.startSpeaking}>
-                Start Speaking Timer
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" onClick={timers.pause}>
-                Pause
-              </Button>
-            )}
-            <Button size="sm" onClick={completeSpeech}>
-              Complete &amp; Log Speech
-            </Button>
-            <Button size="sm" variant="ghost" onClick={skipSpeaker}>
-              Skip
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                timers.pause();
-                timers.resetSpeaking();
-              }}
-            >
-              Reset Speaking
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

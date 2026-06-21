@@ -65,16 +65,6 @@ export const MOTION_TYPES: {
       { key: "duration", label: "Duration (min)", type: "text" },
       { key: "speaking_time", label: "Speaking time (sec)", type: "text" },
       { key: "topic", label: "Topic", type: "text" },
-      {
-        key: "speak_order",
-        label: "Reserve first/last?",
-        type: "select",
-        options: [
-          { value: "", label: "None" },
-          { value: "first", label: "Speak first" },
-          { value: "last", label: "Speak last" },
-        ],
-      },
     ],
   },
   {

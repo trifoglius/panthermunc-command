@@ -9,7 +9,7 @@ import {
 const DOT_SPACING = 4;
 const DOT_SIZE = 0.95;
 const EVENT_PULSE_MS = 1100;
-const EVENT_BOOST_MAX = 0.58;
+const EVENT_BOOST_MAX = 0.70;
 /** Base flash gate; each dot gets a small offset so the flash front isn't a straight line. */
 const FLASH_CYCLE_THRESHOLD = 0.58;
 const FLASH_THRESHOLD_SPREAD = 0.26;
@@ -20,6 +20,12 @@ const WAVE_Y = 0.008;
 /** Extra px around the header globe where dots stay unlit. */
 const GLOBE_EXCLUSION_PADDING = 8;
 const GLOBE_ZONE_MIN_OPACITY = 0.03;
+const TRAIL_DURATION_MS = 800;
+const TRAIL_RADIUS = 40;
+const TRAIL_BOOST_MAX = 0.80;
+/** Max gap between trail samples; fast moves get interpolated points in between. */
+const TRAIL_SAMPLE_SPACING = 2;
+const MAX_TRAIL_POINTS = 140;
 
 /** Peak flash colors — match globe grid strokes in globals.css. */
 const FLASH_COLORS: Record<
@@ -42,6 +48,12 @@ type GlobeZone = {
   cx: number;
   cy: number;
   radius: number;
+};
+
+type TrailPoint = {
+  x: number;
+  y: number;
+  t: number;
 };
 
 function dotSeed(col: number, row: number) {
@@ -77,8 +89,48 @@ function ambientOpacity(cycle: number) {
   return 0.03 + 0.58 * eased;
 }
 
+function eventBoostAt(now: number, pulseStart: number | null, sustained: boolean) {
+  if (sustained) {
+    const t = (now % EVENT_PULSE_MS) / EVENT_PULSE_MS;
+    return Math.sin(Math.PI * t) * EVENT_BOOST_MAX;
+  }
+
+  if (pulseStart === null) return 0;
+
+  const elapsed = now - pulseStart;
+  if (elapsed >= EVENT_PULSE_MS) return 0;
+
+  const t = elapsed / EVENT_PULSE_MS;
+  return Math.sin(Math.PI * t) * EVENT_BOOST_MAX;
+}
+
+function trailBoostAtDot(
+  dot: Dot,
+  trail: readonly TrailPoint[],
+  now: number
+): number {
+  let boost = 0;
+
+  for (const point of trail) {
+    const age = (now - point.t) / TRAIL_DURATION_MS;
+    if (age >= 1) continue;
+
+    const dx = dot.x - point.x;
+    const dy = dot.y - point.y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq >= TRAIL_RADIUS * TRAIL_RADIUS) continue;
+
+    const dist = Math.sqrt(distSq);
+    const spatial = 1 - dist / TRAIL_RADIUS;
+    const temporal = 1 - age;
+    boost = Math.max(boost, spatial * spatial * temporal * TRAIL_BOOST_MAX);
+  }
+
+  return boost;
+}
+
 export function HeaderDotMatrix() {
-  const { flash, flashKey } = useHeaderGlobeFlash();
+  const { flash, flashKey, sustainedFlash } = useHeaderGlobeFlash();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dotsRef = useRef<Dot[]>([]);
   const rafRef = useRef(0);
@@ -86,6 +138,12 @@ export function HeaderDotMatrix() {
   const eventFlashKindRef = useRef<Exclude<HeaderGlobeFlashKind, null> | null>(
     null
   );
+  const sustainedFlashKindRef = useRef<Exclude<HeaderGlobeFlashKind, null> | null>(
+    null
+  );
+  const trailRef = useRef<TrailPoint[]>([]);
+
+  sustainedFlashKindRef.current = sustainedFlash;
 
   useEffect(() => {
     if (!flash) return;
@@ -137,6 +195,55 @@ export function HeaderDotMatrix() {
       dotsRef.current = dots;
     };
 
+    const header = canvas.parentElement?.parentElement;
+    const trail = trailRef.current;
+
+    const addTrailPoint = (clientX: number, clientY: number) => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+
+      const rect = parent.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+
+      const now = performance.now();
+      const last = trail[trail.length - 1];
+
+      if (!last) {
+        trail.push({ x, y, t: now });
+        return;
+      }
+
+      const dx = x - last.x;
+      const dy = y - last.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < TRAIL_SAMPLE_SPACING) return;
+
+      const steps = Math.ceil(dist / TRAIL_SAMPLE_SPACING);
+      for (let i = 1; i <= steps; i += 1) {
+        const f = i / steps;
+        trail.push({
+          x: last.x + dx * f,
+          y: last.y + dy * f,
+          t: now,
+        });
+      }
+
+      while (trail.length > MAX_TRAIL_POINTS) {
+        trail.shift();
+      }
+    };
+
+    const onMouseMove = (event: MouseEvent) => {
+      if (reducedMotion) return;
+      addTrailPoint(event.clientX, event.clientY);
+    };
+
+    header?.addEventListener("mousemove", onMouseMove);
+
     const draw = (now: number) => {
       const parent = canvas.parentElement;
       if (!parent) return;
@@ -145,19 +252,28 @@ export function HeaderDotMatrix() {
       const height = parent.clientHeight;
       ctx.clearRect(0, 0, width, height);
 
-      let eventBoost = 0;
-      if (eventPulseStartRef.current !== null) {
-        const elapsed = now - eventPulseStartRef.current;
-        if (elapsed < EVENT_PULSE_MS) {
-          const t = elapsed / EVENT_PULSE_MS;
-          eventBoost = Math.sin(Math.PI * t) * EVENT_BOOST_MAX;
-        } else {
-          eventPulseStartRef.current = null;
-          eventFlashKindRef.current = null;
+      if (!reducedMotion) {
+        const cutoff = now - TRAIL_DURATION_MS;
+        while (trail.length > 0 && trail[0].t < cutoff) {
+          trail.shift();
         }
       }
 
-      const flashKind = eventFlashKindRef.current;
+      let eventBoost = 0;
+      let flashKind = eventFlashKindRef.current;
+      const sustainedKind = sustainedFlashKindRef.current;
+
+      if (sustainedKind) {
+        eventBoost = eventBoostAt(now, null, true);
+        flashKind = sustainedKind;
+      } else if (eventPulseStartRef.current !== null) {
+        eventBoost = eventBoostAt(now, eventPulseStartRef.current, false);
+        if (eventBoost === 0) {
+          eventPulseStartRef.current = null;
+          eventFlashKindRef.current = null;
+          flashKind = null;
+        }
+      }
 
       const t = now * 0.001;
       const globeZone = getGlobeExclusionZone(parent);
@@ -178,9 +294,11 @@ export function HeaderDotMatrix() {
           eventBoost > 0 &&
           (reducedMotion || cycle >= dot.flashThreshold);
         const dotBoost = qualifiesForFlash ? eventBoost : 0;
+        const cursorBoost = reducedMotion ? 0 : trailBoostAtDot(dot, trail, now);
 
-        const pulse = Math.min(0.96, ambient + dotBoost);
-        const size = DOT_SIZE + cycle * 0.55 + dotBoost * 1.5;
+        const pulse = Math.min(0.98, ambient + dotBoost + cursorBoost);
+        const size =
+          DOT_SIZE + cycle * 0.55 + dotBoost * 1.5 + cursorBoost * 1.35;
         const half = size / 2;
 
         if (dotBoost > 0 && flashKind) {
@@ -203,6 +321,8 @@ export function HeaderDotMatrix() {
     observer.observe(canvas.parentElement!);
 
     return () => {
+      header?.removeEventListener("mousemove", onMouseMove);
+      trail.length = 0;
       observer.disconnect();
       cancelAnimationFrame(rafRef.current);
     };

@@ -25,7 +25,7 @@ import type { CommitteeType } from "@/lib/types";
 export function Header() {
   const { user, logout, authLoading } = useAuth();
   const { conference, createCommittee, activeCommittee } = useConference();
-  const { flash, flashKey } = useHeaderGlobeFlash();
+  const { flash, flashKey, sustainedFlash } = useHeaderGlobeFlash();
   const { success } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -169,6 +169,7 @@ export function Header() {
             variant="header"
             flash={flash}
             flashKey={flashKey}
+            sustainedFlash={sustainedFlash}
             size={42}
           />
           <div className="min-w-0">

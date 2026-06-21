@@ -21,7 +21,9 @@ export type HeaderGlobeFlashKind =
 type HeaderGlobeFlashContextValue = {
   flash: HeaderGlobeFlashKind;
   flashKey: number;
+  sustainedFlash: HeaderGlobeFlashKind;
   triggerFlash: (kind: Exclude<HeaderGlobeFlashKind, null>) => void;
+  setSustainedFlash: (kind: HeaderGlobeFlashKind) => void;
 };
 
 const HeaderGlobeFlashContext =
@@ -32,6 +34,8 @@ const FLASH_MS = 1100;
 export function HeaderGlobeFlashProvider({ children }: { children: ReactNode }) {
   const [flash, setFlash] = useState<HeaderGlobeFlashKind>(null);
   const [flashKey, setFlashKey] = useState(0);
+  const [sustainedFlash, setSustainedFlash] =
+    useState<HeaderGlobeFlashKind>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
@@ -43,6 +47,10 @@ export function HeaderGlobeFlashProvider({ children }: { children: ReactNode }) 
     timeoutRef.current = setTimeout(() => setFlash(null), FLASH_MS);
   }, []);
 
+  const setSustainedFlashStable = useCallback((kind: HeaderGlobeFlashKind) => {
+    setSustainedFlash(kind);
+  }, []);
+
   useEffect(
     () => () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -51,7 +59,15 @@ export function HeaderGlobeFlashProvider({ children }: { children: ReactNode }) 
   );
 
   return (
-    <HeaderGlobeFlashContext.Provider value={{ flash, flashKey, triggerFlash }}>
+    <HeaderGlobeFlashContext.Provider
+      value={{
+        flash,
+        flashKey,
+        sustainedFlash,
+        triggerFlash,
+        setSustainedFlash: setSustainedFlashStable,
+      }}
+    >
       {children}
     </HeaderGlobeFlashContext.Provider>
   );

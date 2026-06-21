@@ -23,6 +23,63 @@ import {
 const SPIN_MS = 52_000;
 const HEADER_MERIDIAN_COUNT = 6;
 const HEADER_PARALLELS = [-45, 45] as const;
+const SUSTAINED_PULSE_MS = 2800;
+
+type GlobeFrame = {
+  outline: SVGPathElement;
+  meridians: SVGPathElement[];
+  parallels: SVGPathElement[];
+  dots: SVGCircleElement[];
+  continents: SVGPathElement[];
+  rim: SVGCircleElement;
+};
+
+function sustainedPulsePhase(now: number) {
+  return 0.5 + 0.5 * Math.sin((now / SUSTAINED_PULSE_MS) * 2 * Math.PI);
+}
+
+function applySustainedNotificationStroke(frame: GlobeFrame, phase: number) {
+  const gridAlpha = 0.72 + 0.28 * phase;
+  const gridWidth = 0.52 + 0.16 * phase;
+  const gridStroke = `rgba(96, 165, 250, ${gridAlpha.toFixed(3)})`;
+
+  for (const path of frame.meridians) {
+    path.style.stroke = gridStroke;
+    path.style.strokeWidth = gridWidth.toFixed(3);
+  }
+  for (const path of frame.parallels) {
+    path.style.stroke = gridStroke;
+    path.style.strokeWidth = gridWidth.toFixed(3);
+  }
+
+  const outlineAlpha = 0.68 + 0.3 * phase;
+  frame.outline.style.stroke = `rgba(96, 165, 250, ${outlineAlpha.toFixed(3)})`;
+  frame.outline.style.strokeWidth = (0.5 + 0.14 * phase).toFixed(3);
+
+  const rimAlpha = 0.78 + 0.22 * phase;
+  frame.rim.style.stroke = `rgba(59, 130, 246, ${rimAlpha.toFixed(3)})`;
+  frame.rim.style.strokeWidth = (0.54 + 0.18 * phase).toFixed(3);
+
+  const continentAlpha = 0.82 + 0.18 * phase;
+  for (const path of frame.continents) {
+    path.style.stroke = `rgba(96, 165, 250, ${continentAlpha.toFixed(3)})`;
+    path.style.strokeWidth = (0.48 + 0.1 * phase).toFixed(3);
+  }
+}
+
+function clearSustainedStroke(frame: GlobeFrame) {
+  for (const path of [
+    ...frame.meridians,
+    ...frame.parallels,
+    frame.outline,
+    ...frame.continents,
+  ]) {
+    path.style.stroke = "";
+    path.style.strokeWidth = "";
+  }
+  frame.rim.style.stroke = "";
+  frame.rim.style.strokeWidth = "";
+}
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -32,6 +89,21 @@ const FLASH_CLASSES = [
   "globe-flash-notification",
   "globe-flash-timer",
 ] as const;
+
+function sustainedClassFor(kind: HeaderGlobeFlashKind | null | undefined) {
+  switch (kind) {
+    case "pass":
+      return "globe-sustained-pass";
+    case "fail":
+      return "globe-sustained-fail";
+    case "notification":
+      return "globe-sustained-notification";
+    case "timer":
+      return "globe-sustained-timer";
+    default:
+      return "";
+  }
+}
 
 function flashClassFor(kind: HeaderGlobeFlashKind | null | undefined) {
   switch (kind) {
@@ -94,6 +166,7 @@ type RotatingGlobeProps = {
   flash?: HeaderGlobeFlashKind;
   /** Bumps when a flash is re-triggered so CSS animation restarts without remounting. */
   flashKey?: number;
+  sustainedFlash?: HeaderGlobeFlashKind;
   size?: number;
 };
 
@@ -101,17 +174,22 @@ export function RotatingGlobe({
   variant = "login",
   flash = null,
   flashKey = 0,
+  sustainedFlash = null,
   size = 42,
 }: RotatingGlobeProps) {
   const sceneRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const frameRef = useRef<{
-    outline: SVGPathElement;
-    meridians: SVGPathElement[];
-    parallels: SVGPathElement[];
-    dots: SVGCircleElement[];
-    continents: SVGPathElement[];
-  } | null>(null);
+  const frameRef = useRef<GlobeFrame | null>(null);
+  const sustainedFlashRef = useRef<HeaderGlobeFlashKind>(sustainedFlash);
+  const reducedMotionRef = useRef(false);
+
+  sustainedFlashRef.current = sustainedFlash;
+
+  useEffect(() => {
+    reducedMotionRef.current = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+  }, []);
 
   useLayoutEffect(() => {
     if (variant === "header") return;
@@ -171,10 +249,11 @@ export function RotatingGlobe({
     rim.setAttribute("fill", "none");
     svg.appendChild(rim);
 
-    frameRef.current = { outline, meridians, parallels, dots, continents };
+    frameRef.current = { outline, meridians, parallels, dots, continents, rim };
 
     const start = performance.now();
     let raf = 0;
+    let hadSustainedStroke = false;
 
     const render = (now: number) => {
       const frame = frameRef.current;
@@ -198,6 +277,16 @@ export function RotatingGlobe({
         frame.continents.forEach((path, i) => {
           path.setAttribute("d", continentOutlinePath(CONTINENT_OUTLINES[i], rotY));
         });
+
+        const sustained = sustainedFlashRef.current;
+        if (sustained === "notification") {
+          const phase = reducedMotionRef.current ? 1 : sustainedPulsePhase(now);
+          applySustainedNotificationStroke(frame, phase);
+          hadSustainedStroke = true;
+        } else if (hadSustainedStroke) {
+          clearSustainedStroke(frame);
+          hadSustainedStroke = false;
+        }
       } else {
         frame.dots.forEach((dot, i) => {
           const [lat, lon] = CONTINENT_DOTS[i];
@@ -237,6 +326,7 @@ export function RotatingGlobe({
       ? "header-globe-scene header-globe-theme"
       : "globe-scene";
   const flashClass = flashClassFor(flash);
+  const sustainedClass = sustainedClassFor(sustainedFlash);
 
   const headerStyle: CSSProperties | undefined =
     variant === "header"
@@ -245,7 +335,7 @@ export function RotatingGlobe({
 
   return (
     <div
-      className={`${sceneClass} ${flashClass}`.trim()}
+      className={`${sceneClass} ${flashClass} ${sustainedClass}`.trim()}
       ref={sceneRef}
       style={headerStyle}
       aria-hidden
