@@ -14,9 +14,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary: "bg-purple-700 text-white hover:bg-purple-800 border-purple-700",
+  primary:
+    "ui-btn-primary bg-purple-700 text-white hover:bg-purple-800 border-purple-700",
   secondary:
-    "bg-white text-purple-800 border-purple-300 hover:bg-purple-50",
+    "ui-btn-secondary bg-white text-purple-800 border-purple-300 hover:bg-purple-50",
   danger: "bg-red-600 text-white hover:bg-red-700 border-red-600",
   ghost:
     "bg-transparent text-purple-700 hover:bg-purple-50 border-transparent",
@@ -87,11 +88,9 @@ export function Card({
   title?: string;
 }) {
   return (
-    <div
-      className={`rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] shadow-sm ${className}`}
-    >
+    <div className={`theme-glass ${className}`}>
       {title && (
-        <div className="border-b border-purple-100 px-4 py-3">
+        <div className="border-b border-purple-100/80 px-4 py-3">
           <h3 className="text-lg font-semibold text-purple-900">{title}</h3>
         </div>
       )}
@@ -144,7 +143,7 @@ export function Input({
       )}
       <input
         id={id}
-        className={`w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
+        className={`ui-input w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
         {...props}
       />
     </label>
@@ -171,7 +170,7 @@ export function Select({
       )}
       <select
         id={id}
-        className={`w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
+        className={`ui-select w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
         {...props}
       >
         {options.map((o, index) => (
@@ -200,7 +199,7 @@ export function Textarea({
       )}
       <textarea
         id={id}
-        className={`w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
+        className={`ui-textarea w-full rounded-md border border-purple-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 ${className}`}
         {...props}
       />
     </label>
@@ -291,8 +290,8 @@ export function Tabs({
             onClick={() => onChange(tab.id)}
             className={`shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 ${
               selected
-                ? "bg-purple-700 text-white"
-                : "text-purple-800 hover:bg-purple-100"
+                ? "ui-tabs-selected bg-purple-700 text-white"
+                : "ui-tabs-idle text-purple-800 hover:bg-purple-100"
             }`}
           >
             {tab.label}

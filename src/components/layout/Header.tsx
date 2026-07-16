@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
@@ -19,6 +19,7 @@ import {
   useToast,
 } from "@/components/ui";
 import { HeaderDotMatrix } from "@/components/layout/HeaderDotMatrix";
+import { ThemeMenu } from "@/components/layout/ThemeMenu";
 import { RotatingGlobe } from "@/components/login/RotatingGlobe";
 import type { CommitteeType } from "@/lib/types";
 
@@ -39,6 +40,15 @@ export function Header() {
   const canManageConference = user ? hasPermission(user, "conference:manage") : false;
   const canManageUsers = user ? hasPermission(user, "users:manage") : false;
   const canExportAll = user ? hasPermission(user, "export:all") : false;
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (!exportRef.current?.contains(e.target as Node)) setShowExportMenu(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [showExportMenu]);
 
   const handleAddCommittee = async () => {
     if (!name.trim()) return;
@@ -109,13 +119,13 @@ export function Header() {
           {showExportMenu && (
             <div
               role="menu"
-              className="absolute right-0 z-20 mt-1 min-w-[12rem] rounded-md border border-purple-200 bg-white py-1 shadow-lg"
+              className="theme-menu absolute right-0 z-20 mt-1 min-w-[12rem] py-1"
             >
               {activeCommittee && (
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full px-4 py-2 text-left text-sm text-purple-900 hover:bg-purple-50"
+                  className="theme-menu-item block w-full px-4 py-2 text-left text-sm"
                   onClick={handleExportCommittee}
                 >
                   Committee Excel
@@ -126,7 +136,7 @@ export function Header() {
                   <button
                     type="button"
                     role="menuitem"
-                    className="block w-full px-4 py-2 text-left text-sm text-purple-900 hover:bg-purple-50"
+                    className="theme-menu-item block w-full px-4 py-2 text-left text-sm"
                     onClick={handleExportAll}
                   >
                     Full Conference Excel
@@ -134,7 +144,7 @@ export function Header() {
                   <button
                     type="button"
                     role="menuitem"
-                    className="block w-full px-4 py-2 text-left text-sm text-purple-900 hover:bg-purple-50"
+                    className="theme-menu-item block w-full px-4 py-2 text-left text-sm"
                     onClick={handleExportLogs}
                   >
                     Conference Logs
@@ -159,7 +169,7 @@ export function Header() {
   );
 
   return (
-    <header className="relative border-b border-purple-200 bg-[var(--header-bg)] text-white">
+    <header className="theme-header relative border-b text-white">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <HeaderDotMatrix />
       </div>
@@ -205,15 +215,18 @@ export function Header() {
 
           {!authLoading && (
             <div
-              className={`flex items-center gap-2 ${user ? "border-l border-purple-600 pl-2" : ""}`}
+              className={`flex items-center gap-2 ${user ? "border-l border-purple-600/60 pl-2" : ""}`}
             >
               {user && (
-                <span className="hidden text-xs text-purple-200 sm:inline">
-                  {user.displayName}{" "}
-                  <span className="rounded bg-purple-700 px-1 py-0.5 text-purple-100">
-                    {user.role}
+                <>
+                  <span className="hidden text-xs text-purple-200 sm:inline">
+                    {user.displayName}{" "}
+                    <span className="rounded bg-purple-700/80 px-1 py-0.5 text-purple-100">
+                      {user.role}
+                    </span>
                   </span>
-                </span>
+                  <ThemeMenu buttonClassName={headerBtnClass} />
+                </>
               )}
               <Button
                 variant="ghost"
@@ -229,13 +242,13 @@ export function Header() {
       </div>
 
       {showMobileMenu && conference && (
-        <div className="relative z-10 flex flex-wrap gap-2 border-t border-purple-700 px-4 py-3 md:hidden">
+        <div className="relative z-10 flex flex-wrap gap-2 border-t border-purple-700/50 px-4 py-3 md:hidden">
           {actionButtons}
         </div>
       )}
 
       {showAdd && canManageConference && conference && (
-        <div className="relative z-10 border-t border-purple-700 bg-white px-4 py-4 text-gray-900">
+        <div className="relative z-10 border-t border-purple-700/50 bg-[var(--menu-bg)] px-4 py-4 text-gray-900 backdrop-blur-[var(--glass-blur)]">
           <div className="mx-auto max-w-3xl">
             <Card title="New Committee">
               <div className="grid gap-3 md:grid-cols-4">

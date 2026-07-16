@@ -34,7 +34,7 @@ export function CommitteeNav({
   return (
     <nav
       id="committee-nav"
-      className="border-b border-purple-200 bg-purple-50"
+      className="theme-nav border-b border-purple-200"
       aria-label="Committee navigation"
     >
       <div className="mx-auto max-w-7xl px-4">

@@ -53,9 +53,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 
   const variantClasses: Record<ToastVariant, string> = {
-    success: "border-green-200 bg-green-50 text-green-900",
-    error: "border-red-200 bg-red-50 text-red-900",
-    info: "border-purple-200 bg-white text-purple-900",
+    success: "border-green-200/80 bg-green-50/85 text-green-900",
+    error: "border-red-200/80 bg-red-50/85 text-red-900",
+    info: "border-purple-200/80 bg-[var(--menu-bg)] text-purple-900",
   };
 
   return (
@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto rounded-lg border px-4 py-3 text-sm shadow-lg ${variantClasses[t.variant]}`}
+            className={`pointer-events-auto rounded-[var(--card-radius)] border px-4 py-3 text-sm shadow-lg backdrop-blur-[var(--glass-blur)] ${variantClasses[t.variant]}`}
           >
             {t.message}
           </div>

@@ -27,7 +27,7 @@ function NotificationBanner() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="border-b border-blue-200 bg-blue-50" role="region" aria-label="Admin notifications">
+    <div className="border-b border-blue-200/70 bg-blue-50/80 backdrop-blur-[var(--glass-blur)]" role="region" aria-label="Admin notifications">
       {notifications.map((n) => (
         <div
           key={n.id}
@@ -69,7 +69,7 @@ function SyncErrorBanner() {
 
   return (
     <div
-      className="flex items-center justify-between border-b border-yellow-200 bg-yellow-50 px-4 py-2 text-sm text-yellow-800"
+      className="flex items-center justify-between border-b border-yellow-200/70 bg-yellow-50/80 px-4 py-2 text-sm text-yellow-800 backdrop-blur-[var(--glass-blur)]"
       role="alert"
       aria-live="assertive"
     >
@@ -127,8 +127,8 @@ function AppShellInner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--surface)]">
-      <div className="sticky top-0 z-50 bg-[var(--surface)] shadow-sm">
+    <div className="theme-surface min-h-screen">
+      <div className="theme-chrome sticky top-0 z-50 shadow-sm">
         <Header />
         <SyncErrorBanner />
         <NotificationBanner />
@@ -156,7 +156,7 @@ export function CommitteePickerCard() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <div className="rounded-lg border border-purple-200 bg-white p-6 shadow-sm">
+      <div className="theme-glass p-6">
         <h2 className="text-xl font-bold text-purple-900">Select a committee</h2>
         <p className="mt-2 text-sm text-purple-700">
           Choose a committee to open its workspace.
@@ -167,7 +167,7 @@ export function CommitteePickerCard() {
               key={c.id}
               type="button"
               onClick={() => void nav.selectCommitteeWithUrl(c.id)}
-              className="rounded-md border border-purple-300 bg-white px-4 py-2 text-sm font-medium text-purple-800 hover:bg-purple-50"
+              className="ui-btn-secondary rounded-md border border-purple-300 bg-white px-4 py-2 text-sm font-medium text-purple-800 hover:bg-purple-50"
             >
               {c.name}
             </button>

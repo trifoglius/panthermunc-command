@@ -78,14 +78,14 @@ function LoginForm() {
           </form>
         </Card>
 
-        <div className="mt-6 rounded-lg border border-purple-200 bg-white/80 p-4 text-center text-sm text-purple-800 backdrop-blur-sm">
+        <div className="theme-glass mt-6 p-4 text-center text-sm text-purple-800">
           <p className="font-medium text-purple-900">First time setup?</p>
           <p className="mt-1 text-purple-600">
             Initialize the admin account before signing in.
           </p>
           <Link
             href="/login/admin"
-            className="mt-3 inline-block rounded-md border border-purple-300 px-4 py-2 font-medium text-purple-800 hover:bg-purple-50"
+            className="ui-btn-secondary mt-3 inline-block rounded-md border border-purple-300 px-4 py-2 font-medium text-purple-800 hover:bg-purple-50"
           >
             Admin initialization
           </Link>

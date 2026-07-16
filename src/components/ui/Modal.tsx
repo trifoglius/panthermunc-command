@@ -77,7 +77,7 @@ export function Modal({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 theme-overlay"
         aria-label="Close dialog"
         onClick={onClose}
       />
@@ -86,7 +86,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 w-full max-w-md rounded-lg border border-purple-200 bg-white shadow-xl"
+        className="theme-glass relative z-10 w-full max-w-md"
       >
         <div className="border-b border-purple-100 px-4 py-3">
           <h2 id={titleId} className="text-lg font-semibold text-purple-900">
