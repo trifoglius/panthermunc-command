@@ -25,6 +25,7 @@ export function DocumentPanel() {
   const [sponsors, setSponsors] = useState<string[]>([]);
   const [signatories, setSignatories] = useState<string[]>([]);
   const [authorPanel, setAuthorPanel] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
 
   if (!activeCommittee) return null;
 
@@ -32,7 +33,8 @@ export function DocumentPanel() {
     list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
 
   const handleCreate = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || creating) return;
+    setCreating(true);
     addDocument({
       title: title.trim(),
       type,
@@ -49,6 +51,7 @@ export function DocumentPanel() {
     setSponsors([]);
     setSignatories([]);
     setAuthorPanel([]);
+    setTimeout(() => setCreating(false), 500);
   };
 
   return (
@@ -108,7 +111,9 @@ export function DocumentPanel() {
         />
 
         <div className="mt-3">
-          <Button onClick={handleCreate}>Create Document</Button>
+          <Button onClick={handleCreate} disabled={creating}>
+            Create Document
+          </Button>
         </div>
       </Card>
 
@@ -173,6 +178,14 @@ function DocumentRow({
   const [sponsors, setSponsors] = useState(doc.sponsors);
   const [signatories, setSignatories] = useState(doc.signatories);
   const [authorPanel, setAuthorPanel] = useState(doc.authorPanel);
+  const [promoting, setPromoting] = useState(false);
+
+  const handlePromote = () => {
+    if (promoting) return;
+    setPromoting(true);
+    onPromote(doc.id);
+    setTimeout(() => setPromoting(false), 500);
+  };
 
   const toggleId = (list: string[], id: string) =>
     list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -308,7 +321,7 @@ function DocumentRow({
           </Button>
         ))}
         {doc.type === "working_paper" && (
-          <Button size="sm" onClick={() => onPromote(doc.id)}>
+          <Button size="sm" onClick={handlePromote} disabled={promoting}>
             Submit to Dais → Draft Resolution
           </Button>
         )}

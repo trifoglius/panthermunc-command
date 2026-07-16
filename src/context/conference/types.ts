@@ -1,4 +1,5 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
+import type { CommitteeData } from "@/db/schema";
 import type {
   Committee,
   CommitteeType,
@@ -103,6 +104,7 @@ export interface CommitteeSyncEngine {
   syncError: string | null;
   conferenceRef: MutableRefObject<Conference | null>;
   versions: MutableRefObject<Map<string, number>>;
+  baseData: MutableRefObject<Map<string, CommitteeData>>;
   setConference: Dispatch<SetStateAction<Conference | null>>;
   setActiveCommitteeId: Dispatch<SetStateAction<string | null>>;
   setSyncError: Dispatch<SetStateAction<string | null>>;

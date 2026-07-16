@@ -27,6 +27,7 @@ export function MotionPanel() {
   const [notes, setNotes] = useState("");
   const [activeMotionId, setActiveMotionId] = useState<string | null>(null);
   const [sessionMinimized, setSessionMinimized] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [motionSection, setMotionSection] = useState<"motions" | "points">(
     "motions"
   );
@@ -142,7 +143,8 @@ export function MotionPanel() {
   };
 
   const handleSubmit = () => {
-    if (!proposedBy) return;
+    if (!proposedBy || submitting) return;
+    setSubmitting(true);
     addMotion({
       motionTypeId: selectedMotion.id,
       type: selectedMotion.label,
@@ -158,6 +160,7 @@ export function MotionPanel() {
     });
     setDetails({});
     setNotes("");
+    setTimeout(() => setSubmitting(false), 500);
   };
 
   const handleStatusChange = (motion: Motion, status: MotionStatus) => {
@@ -269,7 +272,7 @@ export function MotionPanel() {
         </div>
 
         <div className="mt-3">
-          <Button onClick={handleSubmit} disabled={!proposedBy}>
+          <Button onClick={handleSubmit} disabled={!proposedBy || submitting}>
             Log Motion
           </Button>
         </div>

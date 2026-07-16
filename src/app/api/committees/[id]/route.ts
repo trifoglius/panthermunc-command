@@ -1,6 +1,5 @@
 import { and, eq } from "drizzle-orm";
 import { db, committees } from "@/db";
-import type { CommitteeData } from "@/db/schema";
 import {
   authErrorResponse,
   AuthError,
@@ -8,7 +7,16 @@ import {
   requireCommitteeAccess,
 } from "@/lib/session";
 import { applyCommitteeDataUpdate } from "@/lib/committee-access";
+import {
+  updateCommittee,
+  type CommitteeMutableFields,
+} from "@/lib/committee-repo/committee";
+import { assembleFloor } from "@/lib/committee-repo/floor-assemble";
+import { ensureFloorMigrated } from "@/lib/committee-repo/floor-backfill";
+import { assembleScoring } from "@/lib/committee-repo/scoring-assemble";
+import { ensureScoringMigrated } from "@/lib/committee-repo/scoring-backfill";
 import { canEditCommitteeMetadata } from "@/lib/permissions";
+import type { CommitteeData } from "@/db/schema";
 import type { CommitteeType } from "@/lib/types";
 
 // GET /api/committees/[id]
@@ -22,7 +30,7 @@ export async function GET(
     const { id } = await params;
     await requireCommitteeAccess(id, { refresh: false });
 
-    const [committee] = await db
+    let [committee] = await db
       .select()
       .from(committees)
       .where(eq(committees.id, id))
@@ -32,12 +40,46 @@ export async function GET(
       return Response.json({ error: "Committee not found" }, { status: 404 });
     }
 
+    // Lazily normalize floor + scoring data on first access (cheap flag checks
+    // avoid a row lock on every poll once migrated).
+    if (!committee.floorMigrated) {
+      committee = (await ensureFloorMigrated(id)) ?? committee;
+    }
+    if (!committee.scoringMigrated) {
+      committee = (await ensureScoringMigrated(id)) ?? committee;
+    }
+
     const ifVersion = new URL(request.url).searchParams.get("ifVersion");
     if (ifVersion !== null && committee.version === Number(ifVersion)) {
       return new Response(null, { status: 304 });
     }
 
-    return Response.json(committee);
+    const [floor, scoring] = await Promise.all([
+      assembleFloor(id),
+      assembleScoring(id),
+    ]);
+    const data: CommitteeData = {
+      ...committee.data,
+      delegates: floor.delegates,
+      motions: floor.motions,
+      motionSessionState: floor.motionSessionState,
+      motionQueueHistory: floor.motionQueueHistory,
+      rollCalls: floor.rollCalls,
+      points: floor.points,
+      speakingEvents: floor.speakingEvents,
+      documents: floor.documents,
+      nextDraftSubmissionOrder: committee.nextDraftSubmissionOrder,
+      judgeScores: scoring.judgeScores,
+      daisScores: scoring.daisScores,
+      positionPaperScores: scoring.positionPaperScores,
+    };
+
+    return Response.json({
+      ...committee,
+      data,
+      entityVersions: floor.entityVersions,
+      scoringEntityVersions: scoring.entityVersions,
+    });
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -61,94 +103,64 @@ export async function PATCH(
       return Response.json({ error: "version is required" }, { status: 400 });
     }
 
-    // Fetch current row to check version
-    const [current] = await db
-      .select()
-      .from(committees)
-      .where(eq(committees.id, id))
-      .limit(1);
-
-    if (!current) {
-      return Response.json({ error: "Committee not found" }, { status: 404 });
-    }
-
-    if (current.version !== body.version) {
-      // Return latest data so client can reconcile
-      return Response.json(
-        { error: "Conflict: stale version", latest: current },
-        { status: 409 }
-      );
-    }
-
-    const updates: {
-      version: number;
-      updatedAt: Date;
-      data?: CommitteeData;
-      name?: string;
-      topic?: string;
-      type?: CommitteeType;
-    } = {
-      version: current.version + 1,
-      updatedAt: new Date(),
-    };
-
-    if (body.data !== undefined) {
-      try {
-        updates.data = applyCommitteeDataUpdate(
-          current.data,
-          body.data as Partial<CommitteeData>,
-          session,
-          id
-        );
-      } catch {
-        throw new AuthError("Not authorized to modify committee data", 403);
-      }
-    }
-    if (typeof body.name === "string" && body.name.trim()) {
-      if (!canEditCommitteeMetadata(session, id)) {
-        throw new AuthError("Not authorized to rename committee", 403);
-      }
-      updates.name = body.name.trim();
-    }
-    if (typeof body.topic === "string") {
-      if (!canEditCommitteeMetadata(session, id)) {
-        throw new AuthError("Not authorized to edit committee topic", 403);
-      }
-      updates.topic = body.topic.trim();
-    }
     if (typeof body.type === "string") {
       const validTypes: CommitteeType[] = ["ga", "crisis", "specialized"];
       if (!validTypes.includes(body.type as CommitteeType)) {
         return Response.json({ error: "Invalid committee type" }, { status: 400 });
       }
-      if (!canEditCommitteeMetadata(session, id)) {
-        throw new AuthError("Not authorized to edit committee type", 403);
-      }
-      updates.type = body.type as CommitteeType;
     }
 
-    const [updated] = await db
-      .update(committees)
-      .set(updates)
-      .where(
-        and(eq(committees.id, id), eq(committees.version, body.version))
-      )
-      .returning();
+    // The update set is built inside the transaction from the freshly-read row
+    // so data merges and permission filtering apply to committed state. Auth
+    // failures throw and abort the write; a stale version returns a conflict.
+    const result = await updateCommittee(id, body.version, (current) => {
+      const fields: CommitteeMutableFields = {};
 
-    if (!updated) {
-      // Another request snuck in between our read and write
-      const [latest] = await db
-        .select()
-        .from(committees)
-        .where(eq(committees.id, id))
-        .limit(1);
+      if (body.data !== undefined) {
+        try {
+          fields.data = applyCommitteeDataUpdate(
+            current.data,
+            body.data,
+            session,
+            id
+          );
+        } catch {
+          throw new AuthError("Not authorized to modify committee data", 403);
+        }
+      }
+      if (typeof body.name === "string" && body.name.trim()) {
+        if (!canEditCommitteeMetadata(session, id)) {
+          throw new AuthError("Not authorized to rename committee", 403);
+        }
+        fields.name = body.name.trim();
+      }
+      if (typeof body.topic === "string") {
+        if (!canEditCommitteeMetadata(session, id)) {
+          throw new AuthError("Not authorized to edit committee topic", 403);
+        }
+        fields.topic = body.topic.trim();
+      }
+      if (typeof body.type === "string") {
+        if (!canEditCommitteeMetadata(session, id)) {
+          throw new AuthError("Not authorized to edit committee type", 403);
+        }
+        fields.type = body.type as CommitteeType;
+      }
+
+      return fields;
+    });
+
+    if (!result.ok) {
+      if (result.reason === "notFound") {
+        return Response.json({ error: "Committee not found" }, { status: 404 });
+      }
       return Response.json(
-        { error: "Conflict: concurrent write", latest },
+        { error: "Conflict: stale version", latest: result.latest },
         { status: 409 }
       );
     }
 
-    return Response.json(updated);
+    return Response.json(result.row);
   } catch (err) {
     return authErrorResponse(err);
   }

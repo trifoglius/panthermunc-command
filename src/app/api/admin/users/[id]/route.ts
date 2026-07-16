@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { db, users } from "@/db";
 import { authErrorResponse, requirePermission } from "@/lib/session";
@@ -30,6 +30,7 @@ export async function PATCH(
       password?: unknown;
       role?: unknown;
       permissions?: unknown;
+      version?: unknown;
     };
 
     const updates: {
@@ -38,6 +39,7 @@ export async function PATCH(
       passwordHash?: string;
       role?: UserRole;
       permissions?: Permission[];
+      version?: ReturnType<typeof sql>;
     } = {};
 
     if (typeof payload.displayName === "string") {
@@ -87,11 +89,23 @@ export async function PATCH(
       return Response.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
+    // Optimistic concurrency when a version is supplied; two admins editing the
+    // same user then can't silently overwrite one another.
+    const expectedVersion =
+      typeof payload.version === "number" ? payload.version : undefined;
+    updates.version = sql`${users.version} + 1`;
+
     const [updated] = await db
       .update(users)
       .set(updates)
       .where(
-        and(eq(users.id, id), eq(users.conferenceId, session.conferenceId))
+        expectedVersion !== undefined
+          ? and(
+              eq(users.id, id),
+              eq(users.conferenceId, session.conferenceId),
+              eq(users.version, expectedVersion)
+            )
+          : and(eq(users.id, id), eq(users.conferenceId, session.conferenceId))
       )
       .returning({
         id: users.id,
@@ -100,9 +114,39 @@ export async function PATCH(
         permissions: users.permissions,
         committeeId: users.committeeId,
         displayName: users.displayName,
+        version: users.version,
       });
 
     if (!updated) {
+      if (expectedVersion !== undefined) {
+        const [latest] = await db
+          .select({
+            id: users.id,
+            username: users.username,
+            role: users.role,
+            permissions: users.permissions,
+            committeeId: users.committeeId,
+            displayName: users.displayName,
+            version: users.version,
+          })
+          .from(users)
+          .where(
+            and(eq(users.id, id), eq(users.conferenceId, session.conferenceId))
+          )
+          .limit(1);
+        if (latest) {
+          return Response.json(
+            {
+              error: "Conflict: stale version",
+              latest: {
+                ...latest,
+                permissions: normalizePermissions(latest.permissions ?? []),
+              },
+            },
+            { status: 409 }
+          );
+        }
+      }
       return Response.json({ error: "User not found" }, { status: 404 });
     }
 

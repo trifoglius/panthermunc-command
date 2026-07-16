@@ -10,17 +10,20 @@ export function PointsPanel() {
   const [pointType, setPointType] = useState<PointType>("inquiry");
   const [pointDelegate, setPointDelegate] = useState("");
   const [pointDesc, setPointDesc] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (!activeCommittee) return null;
 
   const logPoint = () => {
-    if (!pointDelegate || !pointDesc.trim()) return;
+    if (!pointDelegate || !pointDesc.trim() || submitting) return;
+    setSubmitting(true);
     addPoint({
       type: pointType,
       delegateId: pointDelegate,
       description: pointDesc.trim(),
     });
     setPointDesc("");
+    setTimeout(() => setSubmitting(false), 500);
   };
 
   const unresolved = activeCommittee.points.filter((p) => !p.resolved);
@@ -69,7 +72,10 @@ export function PointsPanel() {
         />
       </div>
       <div className="mt-3">
-        <Button onClick={logPoint} disabled={!pointDelegate || !pointDesc.trim()}>
+        <Button
+          onClick={logPoint}
+          disabled={!pointDelegate || !pointDesc.trim() || submitting}
+        >
           Log Point
         </Button>
       </div>

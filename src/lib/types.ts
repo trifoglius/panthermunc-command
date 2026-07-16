@@ -160,6 +160,7 @@ export interface Conference {
   name: string;
   year: number;
   committees: Committee[];
+  version?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -116,6 +116,15 @@ export function canEditCommitteeMetadata(
   );
 }
 
+export function canEditScoring(
+  session: { permissions: Permission[]; committeeId: string | null },
+  committeeId: string
+): boolean {
+  if (!hasPermission(session, "scoring:edit")) return false;
+  if (hasPermission(session, "committee:access_all")) return true;
+  return session.committeeId === committeeId;
+}
+
 /** Scoring-related fields a registrar may update without full committee operate access. */
 export const SCORING_DATA_KEYS = [
   "judgeScores",
@@ -126,6 +135,24 @@ export const SCORING_DATA_KEYS = [
 ] as const;
 
 export type ScoringDataKey = (typeof SCORING_DATA_KEYS)[number];
+
+/**
+ * After the Phase 7 cutover the committee JSONB blob only carries settings —
+ * every floor/scoring domain writes to its own normalized tables via the
+ * floor-ops / scoring-ops endpoints. These are the only keys the blob PATCH
+ * path accepts.
+ */
+export const SETTINGS_DATA_KEYS = [
+  "vcRecipientId",
+  "discrepancyThreshold",
+  "requirePositionPapers",
+] as const;
+
+/** Subset of settings a registrar (scoring:edit) may change. */
+export const SCORING_SETTINGS_KEYS = [
+  "vcRecipientId",
+  "discrepancyThreshold",
+] as const;
 
 export function detectRoleFromPermissions(perms: Permission[]): UserRole {
   const normalized = [...perms].sort().join(",");

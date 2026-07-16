@@ -26,6 +26,7 @@ export async function GET() {
         permissions: users.permissions,
         committeeId: users.committeeId,
         displayName: users.displayName,
+        version: users.version,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -133,6 +134,7 @@ export async function POST(request: Request) {
         permissions: users.permissions,
         committeeId: users.committeeId,
         displayName: users.displayName,
+        version: users.version,
         createdAt: users.createdAt,
       });
 

@@ -22,6 +22,7 @@ export function RollCallPanel() {
     activeCommittee?.rollCalls[0]?.id ?? null
   );
   const [absentOnly, setAbsentOnly] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const session =
     activeCommittee?.rollCalls.find((r) => r.id === activeSessionId) ??
@@ -38,8 +39,11 @@ export function RollCallPanel() {
   if (!activeCommittee) return null;
 
   const handleStart = () => {
+    if (starting) return;
+    setStarting(true);
     const id = startRollCall(label || "Roll Call");
     setActiveSessionId(id);
+    setTimeout(() => setStarting(false), 500);
   };
 
   const markAllPresent = () => {
@@ -65,7 +69,9 @@ export function RollCallPanel() {
             onChange={(e) => setLabel(e.target.value)}
             className="max-w-xs"
           />
-          <Button onClick={handleStart}>Start New Roll Call</Button>
+          <Button onClick={handleStart} disabled={starting}>
+            Start New Roll Call
+          </Button>
         </div>
       </Card>
 

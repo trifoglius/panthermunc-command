@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, committees, conferences } from "@/db";
 import {
   authErrorResponse,
@@ -54,10 +54,20 @@ export async function PATCH(request: Request) {
     const session = await requireAdmin();
     const parsed = await parseJsonBody(request);
     if (!parsed.ok) return parsed.response;
-    const payload = parsed.data as { name?: unknown; year?: unknown };
+    const payload = parsed.data as {
+      name?: unknown;
+      year?: unknown;
+      version?: unknown;
+    };
 
-    const updates: { name?: string; year?: number; updatedAt: Date } = {
+    const updates: {
+      name?: string;
+      year?: number;
+      updatedAt: Date;
+      version: ReturnType<typeof sql>;
+    } = {
       updatedAt: new Date(),
+      version: sql`${conferences.version} + 1`,
     };
     if (typeof payload.name === "string" && payload.name.trim()) {
       updates.name = payload.name.trim();
@@ -74,11 +84,38 @@ export async function PATCH(request: Request) {
       updates.year = payload.year;
     }
 
+    // Optimistic concurrency when the client supplies a version; otherwise fall
+    // back to an unconditional update for older clients.
+    const expectedVersion =
+      typeof payload.version === "number" ? payload.version : undefined;
+
     const [updated] = await db
       .update(conferences)
       .set(updates)
-      .where(eq(conferences.id, session.conferenceId))
+      .where(
+        expectedVersion !== undefined
+          ? and(
+              eq(conferences.id, session.conferenceId),
+              eq(conferences.version, expectedVersion)
+            )
+          : eq(conferences.id, session.conferenceId)
+      )
       .returning();
+
+    if (!updated) {
+      if (expectedVersion !== undefined) {
+        const [latest] = await db
+          .select()
+          .from(conferences)
+          .where(eq(conferences.id, session.conferenceId))
+          .limit(1);
+        return Response.json(
+          { error: "Conflict: stale version", latest },
+          { status: 409 }
+        );
+      }
+      return Response.json({ error: "Conference not found" }, { status: 404 });
+    }
 
     return Response.json(updated);
   } catch (err) {

@@ -15,6 +15,34 @@
       "when": 1781700000000,
       "tag": "0001_user_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784170201783,
+      "tag": "0002_floor_normalization",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784171616179,
+      "tag": "0003_documents_and_submission_counter",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784171981780,
+      "tag": "0004_scoring_normalization",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784172216259,
+      "tag": "0005_platform_conflicts",
+      "breakpoints": true
     }
   ]
 }

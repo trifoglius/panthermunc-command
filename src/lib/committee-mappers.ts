@@ -27,6 +27,7 @@ export function committeeToData(c: Committee): CommitteeData {
     vcRecipientId: c.vcRecipientId,
     discrepancyThreshold: c.discrepancyThreshold,
     requirePositionPapers: c.requirePositionPapers,
+    nextDraftSubmissionOrder: c.nextDraftSubmissionOrder ?? 0,
   };
 }
 
@@ -73,6 +74,7 @@ export function emptyCommitteeStub(row: {
     positionPaperScores: [],
     discrepancyThreshold: 10,
     requirePositionPapers: false,
+    nextDraftSubmissionOrder: 0,
   };
 }
 
@@ -92,4 +94,6 @@ export const COMMITTEE_DATA_KEYS: ReadonlyArray<keyof CommitteeData> = [
   "vcRecipientId",
   "discrepancyThreshold",
   "requirePositionPapers",
+  // NOTE: nextDraftSubmissionOrder is intentionally excluded — it is a
+  // server-assigned atomic counter (Phase 4), never written from the client.
 ];

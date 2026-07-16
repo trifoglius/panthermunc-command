@@ -29,6 +29,7 @@ interface UserRow {
   permissions: Permission[];
   committeeId: string | null;
   displayName: string;
+  version: number;
 }
 
 function needsCommitteeAssignment(role: UserRole, permissions: Permission[]) {
@@ -162,17 +163,36 @@ export default function AdminUsersPage() {
     }
   };
 
+  const versionOf = (uid: string) => users.find((u) => u.id === uid)?.version;
+
+  // Reconcile local state after a 409 by adopting the server's latest row so the
+  // admin sees the concurrent change before retrying.
+  const applyConflict = (uid: string, latest?: UserRow) => {
+    if (latest) {
+      setUsers((prev) => prev.map((u) => (u.id === uid ? latest : u)));
+      setEditRoles((prev) => ({ ...prev, [uid]: latest.role }));
+      setEditPermissions((prev) => ({ ...prev, [uid]: latest.permissions }));
+      setEditCommittees((prev) => ({
+        ...prev,
+        [uid]: latest.committeeId ?? "",
+      }));
+    }
+    showError("This user was changed elsewhere — reloaded the latest values.");
+  };
+
   const handleUpdateCommittee = async (uid: string) => {
     const committeeId = editCommittees[uid] || null;
     const r = await fetch(`/api/admin/users/${uid}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ committeeId }),
+      body: JSON.stringify({ committeeId, version: versionOf(uid) }),
     });
     if (r.ok) {
       const updated: UserRow = await r.json();
       setUsers((prev) => prev.map((u) => (u.id === uid ? updated : u)));
       success("Committee assignment updated");
+    } else if (r.status === 409) {
+      applyConflict(uid, (await r.json()).latest);
     } else {
       showError("Failed to update committee assignment");
     }
@@ -187,6 +207,7 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           role: editRoles[uid],
           permissions: editPermissions[uid],
+          version: versionOf(uid),
         }),
       });
       if (r.ok) {
@@ -195,6 +216,8 @@ export default function AdminUsersPage() {
         setEditRoles((prev) => ({ ...prev, [uid]: updated.role }));
         setEditPermissions((prev) => ({ ...prev, [uid]: updated.permissions }));
         success("Permissions saved");
+      } else if (r.status === 409) {
+        applyConflict(uid, (await r.json()).latest);
       } else {
         showError("Failed to save permissions");
       }
@@ -209,11 +232,15 @@ export default function AdminUsersPage() {
     const r = await fetch(`/api/admin/users/${uid}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password, version: versionOf(uid) }),
     });
     if (r.ok) {
+      const updated: UserRow = await r.json();
+      setUsers((prev) => prev.map((u) => (u.id === uid ? updated : u)));
       setEditPasswords((prev) => ({ ...prev, [uid]: "" }));
       success("Password updated");
+    } else if (r.status === 409) {
+      applyConflict(uid, (await r.json()).latest);
     } else {
       showError("Failed to reset password");
     }

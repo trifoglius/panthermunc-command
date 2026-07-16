@@ -1,14 +1,30 @@
-import { authErrorResponse, hasPermission, requirePermission, requireSession } from "@/lib/session";
+import { and, desc, eq, gt } from "drizzle-orm";
+import { db, notifications } from "@/db";
+import {
+  authErrorResponse,
+  hasPermission,
+  requirePermission,
+  requireSession,
+} from "@/lib/session";
 import { parseJsonBody } from "@/lib/api/parse-json-body";
 import type { NotificationItem } from "@/lib/types";
 
-type Notification = NotificationItem;
+const MAX_RESULTS = 50;
 
-// In-process store (survives as long as the serverless instance lives;
-// good enough for a single-conference use case).
-const store: Notification[] = [];
+function toItem(row: typeof notifications.$inferSelect): NotificationItem {
+  return {
+    id: row.id,
+    message: row.message,
+    committeeIds: row.committeeIds ?? null,
+    createdAt:
+      row.createdAt instanceof Date
+        ? row.createdAt.toISOString()
+        : String(row.createdAt),
+    createdBy: row.createdBy,
+  };
+}
 
-// POST /api/notifications  (admin only)
+// POST /api/notifications  (notifications:send)
 // Body: { message: string; committeeIds?: string[] }
 export async function POST(request: Request) {
   try {
@@ -27,19 +43,17 @@ export async function POST(request: Request) {
         ? (payload.committeeIds as string[])
         : null;
 
-    const notification: Notification = {
-      id: crypto.randomUUID(),
-      message: payload.message.trim(),
-      committeeIds,
-      createdAt: new Date().toISOString(),
-      createdBy: session.displayName ?? session.username,
-    };
+    const [row] = await db
+      .insert(notifications)
+      .values({
+        conferenceId: session.conferenceId,
+        message: payload.message.trim(),
+        committeeIds,
+        createdBy: session.displayName ?? session.username,
+      })
+      .returning();
 
-    store.unshift(notification);
-    // Keep at most 50 notifications
-    if (store.length > 50) store.splice(50);
-
-    return Response.json(notification, { status: 201 });
+    return Response.json(toItem(row), { status: 201 });
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -53,21 +67,35 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const since = searchParams.get("since");
 
-    let results = store.filter((n) => {
-      // Committee filter: null means broadcast to all
-      if (n.committeeIds !== null) {
-        if (!session.committeeId) return false;
-        if (!n.committeeIds.includes(session.committeeId)) return false;
-      }
-      // Time filter
-      if (since && n.createdAt <= since) return false;
-      return true;
-    });
+    const sinceDate = since ? new Date(since) : null;
+    const validSince =
+      sinceDate && !Number.isNaN(sinceDate.getTime()) ? sinceDate : null;
 
-    // Conference admins see all notifications
-    if (hasPermission(session, "committee:access_all")) {
-      results = since ? store.filter((n) => n.createdAt > since) : [...store];
-    }
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(
+        validSince
+          ? and(
+              eq(notifications.conferenceId, session.conferenceId),
+              gt(notifications.createdAt, validSince)
+            )
+          : eq(notifications.conferenceId, session.conferenceId)
+      )
+      .orderBy(desc(notifications.createdAt))
+      .limit(MAX_RESULTS);
+
+    // Conference-wide viewers see everything; otherwise filter to broadcasts and
+    // notifications targeting the caller's committee.
+    const canSeeAll = hasPermission(session, "committee:access_all");
+    const results = rows
+      .filter((row) => {
+        if (canSeeAll) return true;
+        if (row.committeeIds === null) return true;
+        if (!session.committeeId) return false;
+        return row.committeeIds.includes(session.committeeId);
+      })
+      .map(toItem);
 
     return Response.json(results);
   } catch (err) {
@@ -75,20 +103,29 @@ export async function GET(request: Request) {
   }
 }
 
-// DELETE /api/notifications/:id  handled below via ?id= to keep one file
+// DELETE /api/notifications?id=<id>  (notifications:send)
 export async function DELETE(request: Request) {
   try {
-    await requirePermission("notifications:send");
+    const session = await requirePermission("notifications:send");
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) {
       return Response.json({ error: "id is required" }, { status: 400 });
     }
-    const idx = store.findIndex((n) => n.id === id);
-    if (idx === -1) {
+
+    const deleted = await db
+      .delete(notifications)
+      .where(
+        and(
+          eq(notifications.id, id),
+          eq(notifications.conferenceId, session.conferenceId)
+        )
+      )
+      .returning({ id: notifications.id });
+
+    if (!deleted.length) {
       return Response.json({ error: "Not found" }, { status: 404 });
     }
-    store.splice(idx, 1);
     return Response.json({ ok: true });
   } catch (err) {
     return authErrorResponse(err);
