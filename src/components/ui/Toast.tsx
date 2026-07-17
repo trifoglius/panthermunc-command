@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { playSfx } from "@/lib/ui-audio";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -38,6 +39,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, variant: ToastVariant = "info") => {
       const id = ++toastId;
       setToasts((prev) => [...prev, { id, message, variant }]);
+      if (variant === "error") playSfx("sfxError");
       window.setTimeout(() => dismiss(id), 4000);
     },
     [dismiss]

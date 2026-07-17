@@ -4,18 +4,25 @@ export const THEMES = [
   {
     id: "classic",
     label: "Classic",
-    description: "Solid purple workspace",
+    description: "Purple chrome · bright plaza world",
   },
   {
     id: "frutiger-aero",
-    label: "Frutiger Aero",
-    description: "Glossy glass and soft sky",
+    label: "Home Menu",
+    description: "Wii U–style glass plaza",
+  },
+  {
+    id: "classy",
+    label: "Classy",
+    description: "Ivory, brass, and serif type",
   },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 
-export const DEFAULT_THEME: ThemeId = "classic";
+export const DEFAULT_THEME: ThemeId = "frutiger-aero";
+
+export const THEME_IDS = THEMES.map((t) => t.id);
 
 export function isThemeId(value: unknown): value is ThemeId {
   return THEMES.some((t) => t.id === value);

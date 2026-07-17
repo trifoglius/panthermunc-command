@@ -1,16 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
-import { CommitteeNav } from "@/components/layout/CommitteeNav";
 import { Header } from "@/components/layout/Header";
 import { LoadingScreen } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { useHeaderGlobeFlash } from "@/context/HeaderGlobeFlashContext";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useWorkspaceNavigation } from "@/hooks/useWorkspaceNavigation";
-import { canAccessAllCommittees } from "@/lib/permissions";
 
 function NotificationBanner() {
   const { user, authLoading } = useAuth();
@@ -27,7 +23,11 @@ function NotificationBanner() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="border-b border-blue-200/70 bg-blue-50/80 backdrop-blur-[var(--glass-blur)]" role="region" aria-label="Admin notifications">
+    <div
+      className="mx-4 mt-2 rounded-xl border border-blue-200/70 bg-blue-50/80 backdrop-blur-[var(--glass-blur)]"
+      role="region"
+      aria-label="Admin notifications"
+    >
       {notifications.map((n) => (
         <div
           key={n.id}
@@ -69,7 +69,7 @@ function SyncErrorBanner() {
 
   return (
     <div
-      className="flex items-center justify-between border-b border-yellow-200/70 bg-yellow-50/80 px-4 py-2 text-sm text-yellow-800 backdrop-blur-[var(--glass-blur)]"
+      className="mx-4 mt-2 flex items-center justify-between rounded-xl border border-yellow-200/70 bg-yellow-50/80 px-4 py-2 text-sm text-yellow-800 backdrop-blur-[var(--glass-blur)]"
       role="alert"
       aria-live="assertive"
     >
@@ -85,39 +85,6 @@ function SyncErrorBanner() {
   );
 }
 
-function AppShellNav() {
-  const pathname = usePathname();
-  const { user } = useAuth();
-  const { conference, activeCommittee, loading } = useConference();
-  const nav = useWorkspaceNavigation();
-
-  if (loading || !conference || !user || conference.committees.length === 0) {
-    return null;
-  }
-
-  const hideCommitteeNav =
-    pathname === "/settings" || pathname.startsWith("/admin/users");
-
-  if (hideCommitteeNav) return null;
-
-  const showTabs = pathname === "/";
-  const showCommitteeNav =
-    showTabs ||
-    canAccessAllCommittees(user) ||
-    !!activeCommittee;
-
-  if (!showCommitteeNav) return null;
-
-  return (
-    <CommitteeNav
-      activeTab={nav.activeTab}
-      onTabChange={nav.setActiveTab}
-      onSelectCommittee={nav.selectCommitteeWithUrl}
-      showTabs={showTabs}
-    />
-  );
-}
-
 function AppShellInner({ children }: { children: ReactNode }) {
   const { authLoading } = useAuth();
   const { loading } = useConference();
@@ -127,14 +94,14 @@ function AppShellInner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="theme-surface min-h-screen">
-      <div className="theme-chrome sticky top-0 z-50 shadow-sm">
-        <Header />
+    <div className="theme-surface app-shell-root">
+      {/* Atmosphere is rendered inside the Three.js world */}
+      <div className="theme-chrome app-shell-chrome relative z-50">
+        <Header compact />
         <SyncErrorBanner />
         <NotificationBanner />
-        <AppShellNav />
       </div>
-      {children}
+      <div className="app-shell-main relative z-10">{children}</div>
     </div>
   );
 }
@@ -144,36 +111,5 @@ export function AppShell({ children }: { children: ReactNode }) {
     <Suspense fallback={<LoadingScreen />}>
       <AppShellInner>{children}</AppShellInner>
     </Suspense>
-  );
-}
-
-export function CommitteePickerCard() {
-  const { user } = useAuth();
-  const { conference } = useConference();
-  const nav = useWorkspaceNavigation();
-
-  if (!user || !conference || !canAccessAllCommittees(user)) return null;
-
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
-      <div className="theme-glass p-6">
-        <h2 className="text-xl font-bold text-purple-900">Select a committee</h2>
-        <p className="mt-2 text-sm text-purple-700">
-          Choose a committee to open its workspace.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {conference.committees.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => void nav.selectCommitteeWithUrl(c.id)}
-              className="ui-btn-secondary rounded-md border border-purple-300 bg-white px-4 py-2 text-sm font-medium text-purple-800 hover:bg-purple-50"
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }

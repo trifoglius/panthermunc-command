@@ -1,27 +1,21 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { DelegateManager } from "@/components/delegates/DelegateManager";
-import { DocumentPanel } from "@/components/documents/DocumentPanel";
-import { CommitteePickerCard } from "@/components/layout/AppShell";
-import type { TabId } from "@/components/layout/CommitteeNav";
-import { MotionPanel } from "@/components/motions/MotionPanel";
-import { MotionQueuesPanel } from "@/components/motions/MotionQueuesPanel";
-import { RollCallPanel } from "@/components/rollcall/RollCallPanel";
-import { RulesOfProcedurePanel } from "@/components/rules/RulesOfProcedurePanel";
-import { ScoringPanel } from "@/components/scoring/ScoringPanel";
-import { StatsPanel } from "@/components/stats/StatsPanel";
-import { Button, Card, Input, Select } from "@/components/ui";
+import { CommitteeHome } from "@/components/home/CommitteeHome";
+import { ConferenceHome } from "@/components/home/ConferenceHome";
+import { PanelStage } from "@/components/home/PanelStage";
+import { WorkspaceChamber } from "@/components/world/chambers/WorkspaceChamber";
+import { Button, Card, Input, Modal, Select } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { useWorkspaceNavigation } from "@/hooks/useWorkspaceNavigation";
 import { hasPermission, canAccessAllCommittees } from "@/lib/permissions";
 import type { CommitteeType } from "@/lib/types";
-import { countPresent } from "@/lib/rollcall";
-import { getVoteThresholds } from "@/lib/voting";
+import { useUiAudio } from "@/components/UiAudioProvider";
 
 function AdminSetupScreen() {
   const { conference, initConference, createCommittee } = useConference();
+  const { playConfirm } = useUiAudio();
   const [confName, setConfName] = useState(conference?.name ?? "PantherMUNC");
   const [year, setYear] = useState(conference?.year ?? new Date().getFullYear());
   const [committeeName, setCommitteeName] = useState("");
@@ -40,6 +34,7 @@ function AdminSetupScreen() {
         await initConference(confName.trim() || "PantherMUNC", year);
       }
       await createCommittee(committeeName.trim(), committeeType, topic.trim());
+      playConfirm();
     } finally {
       setSaving(false);
     }
@@ -47,9 +42,12 @@ function AdminSetupScreen() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
+      <PanelStage className="!mx-0">
       <div className="mb-8 text-center">
-        <h2 className="text-3xl font-bold text-purple-900">Conference Setup</h2>
-        <p className="mt-2 text-purple-700">
+        <h2 className="text-3xl font-bold text-[color:var(--purple-dark)]">
+          Conference Setup
+        </h2>
+        <p className="mt-2 text-[color:var(--purple-primary)]">
           Set up the conference details and create your first committee.
         </p>
       </div>
@@ -106,73 +104,81 @@ function AdminSetupScreen() {
           </Button>
         </div>
       </Card>
+      </PanelStage>
     </div>
   );
 }
 
-function VoteThresholds({
-  committee,
+function QuickCreateCommitteeModal({
+  open,
+  onClose,
 }: {
-  committee: NonNullable<ReturnType<typeof useConference>["activeCommittee"]>;
+  open: boolean;
+  onClose: () => void;
 }) {
-  const latestRollCall = committee.rollCalls[0] ?? null;
-  if (!latestRollCall) return null;
+  const { createCommittee } = useConference();
+  const { playConfirm } = useUiAudio();
+  const [name, setName] = useState("");
+  const [type, setType] = useState<CommitteeType>("ga");
+  const [topic, setTopic] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const votingBase = countPresent(latestRollCall);
-  const { simpleMajority, superMajority } = getVoteThresholds(votingBase);
-
-  return (
-    <div className="mt-2 flex flex-wrap gap-4 text-sm">
-      <span className="text-purple-600">
-        Based on latest roll call ({latestRollCall.label}):
-      </span>
-      <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Simple majority: {simpleMajority} votes
-      </span>
-      <span className="rounded bg-purple-100 px-2 py-0.5 font-medium text-purple-900">
-        Supermajority: {superMajority} votes
-      </span>
-    </div>
-  );
-}
-
-function CommitteeWorkspace() {
-  const { activeCommittee } = useConference();
-  const { activeTab } = useWorkspaceNavigation();
-
-  if (!activeCommittee) return null;
-
-  const panels: Record<TabId, React.ReactNode> = {
-    delegates: <DelegateManager />,
-    rollcall: <RollCallPanel />,
-    motions: <MotionPanel />,
-    motion_queues: <MotionQueuesPanel />,
-    documents: <DocumentPanel />,
-    scoring: <ScoringPanel />,
-    stats: <StatsPanel />,
-    rules: <RulesOfProcedurePanel />,
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      await createCommittee(name.trim(), type, topic.trim(), type === "ga");
+      playConfirm();
+      setName("");
+      setTopic("");
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6">
-      <div className="mb-4">
-        <h2 className="text-2xl font-bold text-purple-900">
-          {activeCommittee.name}
-        </h2>
-        <p className="text-purple-700">
-          {activeCommittee.type.toUpperCase()} ·{" "}
-          {activeCommittee.topic || "No topic set"}
-        </p>
-        <VoteThresholds committee={activeCommittee} />
+    <Modal open={open} onClose={onClose} title="Create Committee">
+      <div className="grid gap-3">
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. UN Security Council"
+        />
+        <Select
+          label="Type"
+          value={type}
+          onChange={(e) => setType(e.target.value as CommitteeType)}
+          options={[
+            { value: "ga", label: "GA" },
+            { value: "crisis", label: "Crisis" },
+            { value: "specialized", label: "Specialized" },
+          ]}
+        />
+        <Input
+          label="Topic"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreate} disabled={saving || !name.trim()}>
+            {saving ? "Creating..." : "Create"}
+          </Button>
+        </div>
       </div>
-      {panels[activeTab]}
-    </main>
+    </Modal>
   );
 }
 
 function HomeContent() {
   const { user, logout } = useAuth();
-  const { conference, conferenceUnavailable, activeCommittee } = useConference();
+  const { conference, conferenceUnavailable } = useConference();
+  const { view, activeTab } = useWorkspaceNavigation();
+  const [showCreate, setShowCreate] = useState(false);
 
   const noCommittees = !conference || conference.committees.length === 0;
 
@@ -182,12 +188,12 @@ function HomeContent() {
     }
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center">
-        <p className="text-xl font-semibold text-purple-900">
+        <p className="text-xl font-semibold text-[color:var(--purple-dark)]">
           {conferenceUnavailable
             ? "Conference no longer available"
             : "No committees yet"}
         </p>
-        <p className="mt-2 text-purple-600">
+        <p className="mt-2 text-[color:var(--purple-primary)]">
           {conferenceUnavailable
             ? "This conference has been removed. Sign out to return to the login page."
             : "Ask your conference admin to assign you to a committee."}
@@ -201,11 +207,30 @@ function HomeContent() {
     );
   }
 
-  if (!activeCommittee && user && canAccessAllCommittees(user)) {
-    return <CommitteePickerCard />;
+  if (view === "conference-home") {
+    if (user && canAccessAllCommittees(user)) {
+      return (
+        <>
+          <ConferenceHome onRequestCreate={() => setShowCreate(true)} />
+          <QuickCreateCommitteeModal
+            open={showCreate}
+            onClose={() => setShowCreate(false)}
+          />
+        </>
+      );
+    }
+    return <CommitteeHome />;
   }
 
-  return <CommitteeWorkspace />;
+  if (view === "committee-home") {
+    return <CommitteeHome />;
+  }
+
+  if (activeTab) {
+    return <WorkspaceChamber activeTab={activeTab} />;
+  }
+
+  return <CommitteeHome />;
 }
 
 export default function Home() {

@@ -7,11 +7,11 @@ import {
   Card,
   ConfirmDialog,
   Input,
-  LinkButton,
   LoadingScreen,
   Select,
   useToast,
 } from "@/components/ui";
+import { UsersChamber } from "@/components/world/chambers/AdminChambers";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
@@ -274,15 +274,8 @@ export default function AdminUsersPage() {
   if (!allowed) return null;
 
   return (
-    <>
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-purple-900">User Management</h2>
-          <LinkButton href="/" variant="ghost">
-            Back to Conference
-          </LinkButton>
-        </div>
-
+    <UsersChamber>
+      <div className="max-w-3xl space-y-6">
         <Card title="Add User">
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
@@ -473,6 +466,6 @@ export default function AdminUsersPage() {
         }
         confirmLabel="Delete"
       />
-    </>
+    </UsersChamber>
   );
 }

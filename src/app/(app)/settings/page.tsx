@@ -7,11 +7,11 @@ import {
   Card,
   ConfirmDialog,
   Input,
-  LinkButton,
   LoadingScreen,
   Select,
   useToast,
 } from "@/components/ui";
+import { SettingsChamber } from "@/components/world/chambers/AdminChambers";
 import { useConference } from "@/context/ConferenceContext";
 import { usePolling } from "@/hooks/usePolling";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
@@ -301,22 +301,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-bold text-purple-900">
-              Manage Conference
-            </h2>
-            {(hasUnsavedConferenceDetails || hasUnsavedCommittees) && (
-              <div className="mt-1">
-                <Badge color="yellow">Unsaved changes</Badge>
-              </div>
-            )}
-          </div>
-          <LinkButton href="/" variant="ghost">
-            Back to Conference
-          </LinkButton>
-        </div>
+    <SettingsChamber>
+      <div className="max-w-7xl space-y-6">
+        {(hasUnsavedConferenceDetails || hasUnsavedCommittees) && (
+          <Badge color="yellow">Unsaved changes</Badge>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="space-y-6">
@@ -479,6 +468,7 @@ export default function SettingsPage() {
             </Card>
           </div>
         </div>
+      </div>
 
       <ConfirmDialog
         open={!!confirmRemoveId}
@@ -515,6 +505,6 @@ export default function SettingsPage() {
         confirmLabel="Change type"
         variant="primary"
       />
-    </div>
+    </SettingsChamber>
   );
 }

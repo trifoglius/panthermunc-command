@@ -7,10 +7,12 @@ import {
   getDefaultTab,
   getVisibleTabs,
   isValidTabId,
-  resolveActiveTab,
 } from "@/lib/workspace-url";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
+import { canAccessAllCommittees } from "@/lib/permissions";
+
+export type WorkspaceView = "conference-home" | "committee-home" | "panel";
 
 export function useWorkspaceNavigation() {
   const searchParams = useSearchParams();
@@ -28,29 +30,56 @@ export function useWorkspaceNavigation() {
     [user]
   );
 
-  const activeTab: TabId = useMemo(() => {
-    if (!user) return "delegates";
-    return resolveActiveTab(tabParam, user);
-  }, [tabParam, user]);
+  /** Active panel tab when a tab is in the URL; null on home views. */
+  const activeTab: TabId | null = useMemo(() => {
+    if (!user || !tabParam) return null;
+    if (isValidTabId(tabParam) && visibleTabs.includes(tabParam)) {
+      return tabParam;
+    }
+    return null;
+  }, [tabParam, user, visibleTabs]);
+
+  const view: WorkspaceView = useMemo(() => {
+    if (!committeeParam) return "conference-home";
+    if (!tabParam || !activeTab) return "committee-home";
+    return "panel";
+  }, [committeeParam, tabParam, activeTab]);
 
   const buildUrl = useCallback(
-    (params: { committee?: string | null; tab?: TabId }) => {
-      const next = new URLSearchParams(searchParams.toString());
-      if (params.committee !== undefined) {
-        if (params.committee) next.set("committee", params.committee);
-        else next.delete("committee");
+    (params: {
+      committee?: string | null;
+      tab?: TabId | null;
+      clearTab?: boolean;
+    }) => {
+      const next = new URLSearchParams();
+      const committee =
+        params.committee !== undefined
+          ? params.committee
+          : searchParams.get("committee");
+
+      if (committee) next.set("committee", committee);
+
+      if (params.clearTab) {
+        // omit tab
+      } else if (params.tab !== undefined) {
+        if (params.tab) next.set("tab", params.tab);
+      } else {
+        const existing = searchParams.get("tab");
+        if (existing) next.set("tab", existing);
       }
-      if (params.tab !== undefined) {
-        next.set("tab", params.tab);
-      }
+
       const qs = next.toString();
-      return `${pathname}${qs ? `?${qs}` : ""}`;
+      return `/${qs ? `?${qs}` : ""}`;
     },
-    [pathname, searchParams]
+    [searchParams]
   );
 
   const replaceUrl = useCallback(
-    (params: { committee?: string | null; tab?: TabId }) => {
+    (params: {
+      committee?: string | null;
+      tab?: TabId | null;
+      clearTab?: boolean;
+    }) => {
       router.replace(buildUrl(params));
     },
     [router, buildUrl]
@@ -61,7 +90,11 @@ export function useWorkspaceNavigation() {
 
     if (committeeParam) {
       const exists = conference.committees.some((c) => c.id === committeeParam);
-      if (exists && activeCommittee?.id !== committeeParam) {
+      if (!exists) {
+        replaceUrl({ committee: null, clearTab: true });
+        return;
+      }
+      if (activeCommittee?.id !== committeeParam) {
         void selectCommittee(committeeParam);
       }
     }
@@ -72,22 +105,20 @@ export function useWorkspaceNavigation() {
     user,
     activeCommittee?.id,
     selectCommittee,
+    replaceUrl,
   ]);
 
+  // Fix invalid tab params; do not auto-inject a tab (homes are intentional).
   useEffect(() => {
     if (loading || !user || pathname !== "/") return;
+    if (!tabParam) return;
 
-    const needsTab =
-      !tabParam ||
-      !isValidTabId(tabParam) ||
-      !visibleTabs.includes(tabParam as TabId);
-    const needsCommittee =
-      !!activeCommittee && committeeParam !== activeCommittee.id;
-
-    if (needsTab || needsCommittee) {
+    const invalid =
+      !isValidTabId(tabParam) || !visibleTabs.includes(tabParam as TabId);
+    if (invalid) {
       replaceUrl({
-        committee: committeeParam ?? activeCommittee?.id ?? null,
-        tab: needsTab ? activeTab : (tabParam as TabId),
+        committee: committeeParam,
+        clearTab: true,
       });
     }
   }, [
@@ -97,7 +128,25 @@ export function useWorkspaceNavigation() {
     tabParam,
     committeeParam,
     visibleTabs,
-    activeTab,
+    replaceUrl,
+  ]);
+
+  // Single-committee users: land on committee home when no committee in URL.
+  useEffect(() => {
+    if (loading || !user || !conference || pathname !== "/") return;
+    if (committeeParam) return;
+    if (canAccessAllCommittees(user)) return;
+    if (user.committeeId) {
+      replaceUrl({ committee: user.committeeId, clearTab: true });
+    } else if (activeCommittee) {
+      replaceUrl({ committee: activeCommittee.id, clearTab: true });
+    }
+  }, [
+    loading,
+    user,
+    conference,
+    pathname,
+    committeeParam,
     activeCommittee,
     replaceUrl,
   ]);
@@ -112,36 +161,54 @@ export function useWorkspaceNavigation() {
     [replaceUrl, activeCommittee?.id, committeeParam]
   );
 
-  const selectCommitteeWithUrl = useCallback(
+  const selectCommitteeHome = useCallback(
     async (id: string) => {
       await selectCommittee(id);
-      replaceUrl({ committee: id, tab: activeTab });
+      replaceUrl({ committee: id, clearTab: true });
     },
-    [selectCommittee, replaceUrl, activeTab]
+    [selectCommittee, replaceUrl]
   );
+
+  const selectCommitteeWithUrl = useCallback(
+    async (id: string) => {
+      await selectCommitteeHome(id);
+    },
+    [selectCommitteeHome]
+  );
+
+  const goToCommitteeHome = useCallback(() => {
+    replaceUrl({
+      committee: activeCommittee?.id ?? committeeParam,
+      clearTab: true,
+    });
+  }, [replaceUrl, activeCommittee?.id, committeeParam]);
+
+  const goToConferenceHome = useCallback(() => {
+    replaceUrl({ committee: null, clearTab: true });
+  }, [replaceUrl]);
 
   const navigateToWorkspace = useCallback(
     (tab?: TabId) => {
       const nextTab = tab ?? (user ? getDefaultTab(user) : "delegates");
-      replaceUrl({
-        committee: activeCommittee?.id ?? committeeParam,
-        tab: nextTab,
-      });
-      if (pathname !== "/") {
-        router.push(
-          `/?committee=${encodeURIComponent(activeCommittee?.id ?? committeeParam ?? "")}&tab=${nextTab}`
-        );
-      }
+      const committee = activeCommittee?.id ?? committeeParam ?? "";
+      router.push(
+        `/?committee=${encodeURIComponent(committee)}&tab=${nextTab}`
+      );
     },
-    [replaceUrl, activeCommittee?.id, committeeParam, pathname, router, user]
+    [activeCommittee?.id, committeeParam, router, user]
   );
 
   return {
+    view,
     activeTab,
     setActiveTab,
     selectCommitteeWithUrl,
+    selectCommitteeHome,
+    goToCommitteeHome,
+    goToConferenceHome,
     visibleTabs,
     navigateToWorkspace,
     committeeParam,
+    tabParam,
   };
 }
