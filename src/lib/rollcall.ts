@@ -1,6 +1,6 @@
 import type { Committee, Delegate, RollCallSession } from "./types";
 
-/** Returns true if the delegate is present or present & voting on the latest roll call. */
+/** Present includes legacy present_voting for old roll-call data. */
 export function isDelegatePresent(
   committee: Committee,
   delegateId: string
@@ -11,21 +11,19 @@ export function isDelegatePresent(
   return status === "present" || status === "present_voting";
 }
 
-/** Count delegates marked present or present & voting in a roll call session. */
 export function countPresent(session: RollCallSession): number {
   return Object.values(session.attendance).filter(
     (s) => s === "present" || s === "present_voting"
   ).length;
 }
 
-/** Count delegates marked present & voting in a roll call session. */
+/** @deprecated Present & Voting removed; returns 0 for new sessions. */
 export function countPresentVoting(session: RollCallSession): number {
   return Object.values(session.attendance).filter(
     (s) => s === "present_voting"
   ).length;
 }
 
-/** True if the given session has quorum (more than half of total delegates present). */
 export function computeQuorumMet(
   session: RollCallSession,
   totalDelegates: number
@@ -37,7 +35,7 @@ export function getLatestRollCall(committee: Committee): RollCallSession | null 
   return committee.rollCalls[0] ?? null;
 }
 
-/** Delegates eligible for roll-call voting (present or present & voting). */
+/** All present members are eligible for recorded votes. */
 export function getRollCallVotingDelegates(
   committee: Committee,
   session: RollCallSession
@@ -48,10 +46,10 @@ export function getRollCallVotingDelegates(
   });
 }
 
-/** Present (non-voting) delegates may abstain; present & voting delegates may not. */
+/** All present members may abstain. */
 export function canDelegateAbstainOnRollCall(
-  session: RollCallSession,
-  delegateId: string
+  _session: RollCallSession,
+  _delegateId: string
 ): boolean {
-  return session.attendance[delegateId] === "present";
+  return true;
 }

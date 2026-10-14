@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { Committee, Conference, Motion, MotionQueueSnapshot } from "./types";
-import { buildDelegateStats, getAwardPreview } from "./scoring";
+import { getAmendmentClauses } from "./documents";
+import { buildDelegateStats } from "./delegate-stats";
 
 function sheetFromRows(rows: Record<string, unknown>[], name: string) {
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -26,7 +27,6 @@ function motionToRow(
     Motion: motion.type,
     ProposedBy: delegateCountry(committee, motion.proposedBy),
     Status: motion.status,
-    Disruptivity: motion.disruptivity,
     "Votes For": motion.votesFor ?? "",
     "Votes Against": motion.votesAgainst ?? "",
     Abstain: motion.votesAbstain ?? "",
@@ -60,9 +60,9 @@ function buildMotionQueueSummaryRows(
 
   const passedMotion =
     committee.motions.find((m) => m.status === "passed") ?? null;
-  const sessionState = passedMotion
-    ? committee.motionSessionState?.[passedMotion.id]
-    : undefined;
+  const session = committee.sessionState;
+  const caucus = session?.activeCaucus;
+  const vote = session?.voteContext;
 
   const activeRow: Record<string, unknown> = {
     Queue: "Current Queue (Active)",
@@ -71,18 +71,19 @@ function buildMotionQueueSummaryRows(
     "Passed By": passedMotion
       ? delegateCountry(committee, passedMotion.proposedBy)
       : "",
-    "Speaker List": formatDelegateList(committee, sessionState?.speakerQueue),
-    "Speakers For": formatDelegateList(committee, sessionState?.speakersFor),
-    "Speakers Against": formatDelegateList(
+    "Speaker List": formatDelegateList(
       committee,
-      sessionState?.speakersAgainst
+      caucus
+        ? [...(caucus.completedSpeakers ?? []), ...caucus.speakerQueue]
+        : session?.generalDebate.speakerQueue
     ),
-    "Presentation Delegates": formatDelegateList(
-      committee,
-      sessionState?.presentationDelegates
-    ),
-    "QA Delegates": formatDelegateList(committee, sessionState?.qaDelegates),
+    "Speakers For": formatDelegateList(committee, vote?.speakersFor),
+    "Speakers Against": formatDelegateList(committee, vote?.speakersAgainst),
+    "Presentation Delegates": "",
+    "QA Delegates": "",
     "Motion Count": committee.motions.length,
+    "Speaking Sec": session?.speakingTime.speakingSec ?? "",
+    "Agenda Adopted": session?.agenda.adopted ? "Yes" : "No",
   };
 
   return [activeRow, ...archivedRows];
@@ -119,18 +120,13 @@ function snapshotToSummaryRow(
 
 export function exportCommitteeToExcel(committee: Committee) {
   const stats = buildDelegateStats(committee);
-  const awards = getAwardPreview(committee);
 
   const infoRows = [
     {
       Name: committee.name,
       Type: committee.type.toUpperCase(),
       Topic: committee.topic,
-      "Discrepancy Threshold": committee.discrepancyThreshold,
       "Require Position Papers": committee.requirePositionPapers ? "Yes" : "No",
-      "Verbal Commendation": committee.vcRecipientId
-        ? delegateCountry(committee, committee.vcRecipientId)
-        : "",
     },
   ];
 
@@ -146,13 +142,6 @@ export function exportCommitteeToExcel(committee: Committee) {
       "Docs Sponsored": s?.documentsSponsored ?? 0,
       "Docs Signed": s?.documentsSigned ?? 0,
       "Points Raised": s?.pointsRaised ?? 0,
-      "Judge Score": s?.judgeScore ?? "",
-      "Dais Score": s?.daisScore ?? "",
-      "Composite Score": s?.compositeScore ?? "",
-      "Abs. Difference": s?.absoluteDifference ?? "",
-      Rank: s?.rank ?? "",
-      "PP Score": s?.positionPaperScore ?? "",
-      "Special Circumstance": s?.specialCircumstance ?? "",
     };
   });
 
@@ -173,6 +162,8 @@ export function exportCommitteeToExcel(committee: Committee) {
     Type: p.type,
     Country: delegateCountry(committee, p.delegateId),
     Description: p.description,
+    Ruling: p.chairRuling ?? "",
+    "Appeal Status": p.appealStatus ?? "",
     Resolved: p.resolved ? "Yes" : "No",
   }));
 
@@ -184,17 +175,27 @@ export function exportCommitteeToExcel(committee: Committee) {
     Sponsors: doc.sponsors
       .map((id) => delegateCountry(committee, id))
       .join(", "),
-    Signatories: doc.signatories
-      .map((id) => delegateCountry(committee, id))
-      .join(", "),
-    "Author Panel": doc.authorPanel
-      .map((id) => delegateCountry(committee, id))
-      .join(", "),
+    Amendments: doc.amendments.length,
     "Submitted At": doc.submittedAt
       ? new Date(doc.submittedAt).toLocaleString()
       : "",
-    Amendments: doc.amendments.length,
   }));
+
+  const amendmentRows = committee.documents.flatMap((doc) =>
+    doc.amendments.map((a) => {
+      const clauses = getAmendmentClauses(a);
+      return {
+        "Parent Document": doc.title,
+        Title: a.title || clauses[0] || "",
+        Status: a.status,
+        Sponsors: (a.sponsors ?? [])
+          .map((id) => delegateCountry(committee, id))
+          .join(", "),
+        Clauses: clauses.join("; "),
+        Link: a.link ?? "",
+      };
+    })
+  );
 
   const rollCallRows = committee.rollCalls.flatMap((rc) =>
     committee.delegates.map((d) => ({
@@ -206,50 +207,17 @@ export function exportCommitteeToExcel(committee: Committee) {
     }))
   );
 
-  const awardsRows = [
-    {
-      Award: "Best Delegate",
-      Country: awards.bestDelegate?.country ?? "",
-      Delegate: awards.bestDelegate?.delegateName ?? "",
-      Score: awards.bestDelegate?.compositeScore ?? "",
-    },
-    {
-      Award: "Outstanding Delegate",
-      Country: awards.outstandingDelegate?.country ?? "",
-      Delegate: awards.outstandingDelegate?.delegateName ?? "",
-      Score: awards.outstandingDelegate?.compositeScore ?? "",
-    },
-    {
-      Award: "Honorable Delegate",
-      Country: awards.honorableDelegate?.country ?? "",
-      Delegate: awards.honorableDelegate?.delegateName ?? "",
-      Score: awards.honorableDelegate?.compositeScore ?? "",
-    },
-    {
-      Award: "Verbal Commendation",
-      Country: awards.verbalCommendation?.country ?? "",
-      Delegate: awards.verbalCommendation?.delegateName ?? "",
-      Score: "",
-    },
-    {
-      Award: "Position Paper",
-      Country: awards.positionPaper?.country ?? "",
-      Delegate: awards.positionPaper?.delegateName ?? "",
-      Score: awards.positionPaper?.positionPaperScore ?? "",
-    },
-  ];
-
   const wb = XLSX.utils.book_new();
   const sheets = [
     sheetFromRows(infoRows, "Committee Info"),
     sheetFromRows(delegateRows, "Delegate Stats"),
     sheetFromRows(motionRows, "Motions"),
-    sheetFromRows(motionQueueRows, "Motion Queues"),
+    sheetFromRows(motionQueueRows, "Motion History"),
     sheetFromRows(speakingRows, "Speaking Events"),
     sheetFromRows(pointRows, "Points"),
-    sheetFromRows(documentRows, "Documents"),
-    sheetFromRows(rollCallRows, "Roll Call"),
-    sheetFromRows(awardsRows, "Awards Preview"),
+    sheetFromRows(documentRows, "Proposals"),
+    sheetFromRows(amendmentRows, "Amendments"),
+    sheetFromRows(rollCallRows, "Attendance"),
   ];
   sheets.forEach(({ name, ws }) => XLSX.utils.book_append_sheet(wb, ws, name));
 
@@ -264,12 +232,12 @@ export function exportFullConferenceToExcel(conference: Conference) {
       Committee: c.name,
       Country: s.country,
       Delegate: s.delegateName,
-      "Composite Score": s.compositeScore ?? "",
-      Rank: s.rank ?? "",
-      "Judge Score": s.judgeScore ?? "",
-      "Dais Score": s.daisScore ?? "",
-      "Abs. Difference": s.absoluteDifference ?? "",
-      "Special Circumstance": s.specialCircumstance ?? "",
+      Speeches: s.speeches,
+      "Speaking Time (sec)": s.totalSpeakingSeconds,
+      "Motions Proposed": s.motionsProposed,
+      "Docs Sponsored": s.documentsSponsored,
+      "Docs Signed": s.documentsSigned,
+      "Points Raised": s.pointsRaised,
     }));
   });
 
@@ -316,8 +284,9 @@ export function exportFullConferenceToExcel(conference: Conference) {
       Country: s.country,
       Delegate: s.delegateName,
       Speeches: s.speeches,
-      "Composite Score": s.compositeScore ?? "",
-      Rank: s.rank ?? "",
+      "Speaking Time (sec)": s.totalSpeakingSeconds,
+      Motions: s.motionsProposed,
+      Points: s.pointsRaised,
     }));
     const safeName = c.name.slice(0, 31).replace(/[\\/?*[\]]/g, "");
     XLSX.utils.book_append_sheet(

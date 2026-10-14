@@ -6,7 +6,7 @@ import { authErrorResponse, requireAdmin, requireSession } from "@/lib/session";
 import { parseJsonBody } from "@/lib/api/parse-json-body";
 import { canAccessAllCommittees } from "@/lib/permissions";
 import { DEFAULT_DELEGATES_GA } from "@/lib/constants";
-import { createEmptyRubricScore } from "@/lib/scoring";
+import { createEmptySessionState } from "@/lib/session-state";
 import type { CommitteeType, Delegate } from "@/lib/types";
 
 // POST /api/committees
@@ -44,23 +44,19 @@ export async function POST(request: Request) {
           }))
         : [];
 
-    const type = payload.type as CommitteeType;
-    const judgeScores = delegates.map((d) => createEmptyRubricScore(d.id, type));
-    const daisScores = delegates.map((d) => createEmptyRubricScore(d.id, type));
-
+    const topic =
+      typeof payload.topic === "string" ? payload.topic.trim() : "";
     const emptyData: CommitteeData = {
       delegates,
       rollCalls: [],
       motions: [],
       motionQueueHistory: [],
+      speakerListHistory: [],
       motionSessionState: {},
+      sessionState: createEmptySessionState(topic),
       documents: [],
       speakingEvents: [],
       points: [],
-      judgeScores,
-      daisScores,
-      positionPaperScores: [],
-      discrepancyThreshold: 10,
       requirePositionPapers: payload.type === "ga",
     };
 
@@ -70,7 +66,7 @@ export async function POST(request: Request) {
         conferenceId: session.conferenceId,
         name: payload.name.trim(),
         type: payload.type,
-        topic: typeof payload.topic === "string" ? payload.topic.trim() : "",
+        topic,
         data: emptyData,
         version: 0,
       })

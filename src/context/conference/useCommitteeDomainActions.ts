@@ -8,18 +8,19 @@ import * as motionMutations from "@/lib/committee-mutations/motions";
 import * as documentMutations from "@/lib/committee-mutations/documents";
 import * as speakingMutations from "@/lib/committee-mutations/speaking";
 import * as pointMutations from "@/lib/committee-mutations/points";
-import * as scoringMutations from "@/lib/committee-mutations/scoring";
+import * as sessionMutations from "@/lib/committee-mutations/session";
 import type {
+  Amendment,
   Delegate,
   Document,
+  FloorAllotment,
   Motion,
   Point,
   PositionPaperStatus,
-  PaperVoteRecord,
-  DelegatePaperVote,
   RollCallStatus,
-  ScorerRole,
   SpeakingEvent,
+  VoteContext,
+  VoteMode,
 } from "@/lib/types";
 import type { CommitteeSyncEngine } from "./types";
 
@@ -102,6 +103,7 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
       patchCommittee(cid, (c) =>
         motionMutations.addMotion(c, {
           ...motion,
+          disruptivity: motion.disruptivity ?? 0,
           id: uuidv4(),
           timestamp: new Date().toISOString(),
         })
@@ -118,76 +120,11 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     [patchCommittee, requireCommittee]
   );
 
-  const setMotionSpeakerQueue = useCallback(
-    (motionId: string, queue: string[]) => {
+  const beginProceduralMotionVote = useCallback(
+    (motion: Motion) => {
       const cid = requireCommittee();
       patchCommittee(cid, (c) =>
-        motionMutations.setMotionSpeakerQueue(c, motionId, queue)
-      );
-    },
-    [patchCommittee, requireCommittee]
-  );
-
-  const setMotionVotingSpeakers = useCallback(
-    (motionId: string, speakersFor: string[], speakersAgainst: string[]) => {
-      const cid = requireCommittee();
-      patchCommittee(cid, (c) =>
-        motionMutations.setMotionVotingSpeakers(
-          c,
-          motionId,
-          speakersFor,
-          speakersAgainst
-        )
-      );
-    },
-    [patchCommittee, requireCommittee]
-  );
-
-  const setMotionPaperVotes = useCallback(
-    (motionId: string, paperVotes: PaperVoteRecord[]) => {
-      const cid = requireCommittee();
-      patchCommittee(cid, (c) =>
-        motionMutations.setMotionPaperVotes(c, motionId, paperVotes)
-      );
-    },
-    [patchCommittee, requireCommittee]
-  );
-
-  const setMotionRollCallVote = useCallback(
-    (
-      motionId: string,
-      documentId: string,
-      delegateId: string,
-      vote: DelegatePaperVote
-    ) => {
-      const cid = requireCommittee();
-      patchCommittee(cid, (c) =>
-        motionMutations.setMotionRollCallVote(
-          c,
-          motionId,
-          documentId,
-          delegateId,
-          vote
-        )
-      );
-    },
-    [patchCommittee, requireCommittee]
-  );
-
-  const setMotionPresentationDelegates = useCallback(
-    (
-      motionId: string,
-      presentationDelegates: string[],
-      qaDelegates: string[]
-    ) => {
-      const cid = requireCommittee();
-      patchCommittee(cid, (c) =>
-        motionMutations.setMotionPresentationDelegates(
-          c,
-          motionId,
-          presentationDelegates,
-          qaDelegates
-        )
+        sessionMutations.beginProceduralMotionVote(c, motion)
       );
     },
     [patchCommittee, requireCommittee]
@@ -216,6 +153,8 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
           ...doc,
           id: uuidv4(),
           amendments: [],
+          signatories: doc.signatories ?? [],
+          authorPanel: doc.authorPanel ?? [],
         })
       );
     },
@@ -244,6 +183,39 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     [patchCommittee, requireCommittee]
   );
 
+  const addAmendment = useCallback(
+    (documentId: string, amendment: Omit<Amendment, "id">) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        documentMutations.addAmendment(c, documentId, {
+          ...amendment,
+          id: uuidv4(),
+        })
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const updateAmendment = useCallback(
+    (documentId: string, amendment: Amendment) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        documentMutations.updateAmendment(c, documentId, amendment)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const addSponsor = useCallback(
+    (documentId: string, delegateId: string, amendmentId?: string) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        documentMutations.addSponsor(c, documentId, delegateId, amendmentId)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
   const addSpeakingEvent = useCallback(
     (event: Omit<SpeakingEvent, "id" | "timestamp">) => {
       const cid = requireCommittee();
@@ -264,9 +236,11 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
       patchCommittee(cid, (c) =>
         pointMutations.addPoint(c, {
           ...point,
+          type: "order",
           id: uuidv4(),
           timestamp: new Date().toISOString(),
           resolved: false,
+          appealStatus: "none",
         })
       );
     },
@@ -281,50 +255,224 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     [patchCommittee, requireCommittee]
   );
 
-  const updateRubricScore = useCallback(
+  const setPointRuling = useCallback(
+    (pointId: string, chairRuling: string) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        pointMutations.setPointRuling(c, pointId, chairRuling)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const startAppeal = useCallback(
+    (pointId: string, chairRuling: string) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        pointMutations.startAppeal(c, pointId, chairRuling)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const resolveAppeal = useCallback(
     (
-      role: ScorerRole,
-      delegateId: string,
-      scores: Record<string, number>,
-      notes?: string
+      pointId: string,
+      votesFor: number,
+      votesAgainst: number,
+      votesAbstain?: number
     ) => {
       const cid = requireCommittee();
       patchCommittee(cid, (c) =>
-        scoringMutations.updateRubricScore(c, role, delegateId, scores, notes)
+        pointMutations.resolveAppeal(
+          c,
+          pointId,
+          votesFor,
+          votesAgainst,
+          votesAbstain
+        )
       );
     },
     [patchCommittee, requireCommittee]
   );
 
-  const signScores = useCallback(
-    (role: ScorerRole) => {
+  const setAgendaAdopted = useCallback(
+    (adopted: boolean, topic?: string) => {
       const cid = requireCommittee();
       patchCommittee(cid, (c) =>
-        scoringMutations.signScores(c, role, new Date().toISOString())
+        sessionMutations.setAgendaAdopted(
+          c,
+          adopted,
+          topic,
+          new Date().toISOString()
+        )
       );
     },
     [patchCommittee, requireCommittee]
   );
 
-  const updatePositionPaperScore = useCallback(
-    (delegateId: string, score: number, notes?: string) => {
+  const setSpeakingTime = useCallback(
+    (speakingSec: number) => {
       const cid = requireCommittee();
       patchCommittee(cid, (c) =>
-        scoringMutations.updatePositionPaperScore(c, delegateId, score, notes)
+        sessionMutations.setSpeakingTime(c, speakingSec)
       );
     },
     [patchCommittee, requireCommittee]
   );
 
-  const setVcRecipient = useCallback(
-    (delegateId: string | undefined) => {
+  const setGeneralDebateQueue = useCallback(
+    (speakerQueue: string[], currentIndex?: number) => {
       const cid = requireCommittee();
       patchCommittee(cid, (c) =>
-        scoringMutations.setVcRecipient(c, delegateId)
+        sessionMutations.setGeneralDebateQueue(c, speakerQueue, currentIndex)
       );
     },
     [patchCommittee, requireCommittee]
   );
+
+  const archiveAndClearSpeakersList = useCallback(() => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) =>
+      sessionMutations.archiveAndClearSpeakersList(
+        c,
+        uuidv4(),
+        new Date().toISOString()
+      )
+    );
+  }, [patchCommittee, requireCommittee]);
+
+  const setFloorAllotment = useCallback(
+    (floorAllotment: FloorAllotment | undefined) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.setFloorAllotment(c, floorAllotment)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const setAmendmentPeriod = useCallback(
+    (
+      documentId: string,
+      totalSec: number,
+      active: boolean,
+      endsAt?: string
+    ) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.setAmendmentPeriod(
+          c,
+          documentId,
+          totalSec,
+          active,
+          endsAt
+        )
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const clearAmendmentPeriod = useCallback(() => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => sessionMutations.clearAmendmentPeriod(c));
+  }, [patchCommittee, requireCommittee]);
+
+  const setCaucusSpeakerQueue = useCallback(
+    (queue: string[]) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.setCaucusSpeakerQueue(c, queue)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const advanceCaucusSpeaker = useCallback(() => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => sessionMutations.advanceCaucusSpeaker(c));
+  }, [patchCommittee, requireCommittee]);
+
+  const setCaucusSpeakOrder = useCallback(
+    (speakOrder: "first" | "last" | undefined) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.setCaucusSpeakOrder(c, speakOrder)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const startModeratedCaucus = useCallback(
+    (motion: Motion) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.startModeratedCaucusFromMotion(c, motion)
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const clearActiveCaucus = useCallback(() => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => sessionMutations.clearActiveCaucus(c));
+  }, [patchCommittee, requireCommittee]);
+
+  const clearSuspension = useCallback(() => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => sessionMutations.clearSuspension(c));
+  }, [patchCommittee, requireCommittee]);
+
+  const openVote = useCallback(
+    (documentId: string, mode: VoteMode = "recorded") => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.openVoteContext(
+          c,
+          sessionMutations.createDefaultVoteContext(documentId, mode)
+        )
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const openAmendmentVote = useCallback(
+    (documentId: string, amendmentId: string, mode: VoteMode = "recorded") => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) =>
+        sessionMutations.openVoteContext(c, {
+          target: {
+            type: "amendment",
+            id: amendmentId,
+            parentDocumentId: documentId,
+          },
+          mode,
+          eov: {
+            beforeOpen: false,
+            afterOpen: false,
+            beforeSpeakers: [],
+            afterSpeakers: [],
+          },
+          tallies: { yes: 0, no: 0, abstain: 0 },
+          recordedVotes: {},
+        })
+      );
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const patchVoteContext = useCallback(
+    (patch: Partial<VoteContext>) => {
+      const cid = requireCommittee();
+      patchCommittee(cid, (c) => sessionMutations.patchVoteContext(c, patch));
+    },
+    [patchCommittee, requireCommittee]
+  );
+
+  const clearVoteContext = useCallback(() => {
+    const cid = requireCommittee();
+    patchCommittee(cid, (c) => sessionMutations.clearVoteContext(c));
+  }, [patchCommittee, requireCommittee]);
 
   return {
     addDelegate,
@@ -334,21 +482,36 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     updateRollCallStatus,
     addMotion,
     updateMotion,
-    setMotionSpeakerQueue,
-    setMotionVotingSpeakers,
-    setMotionPaperVotes,
-    setMotionRollCallVote,
-    setMotionPresentationDelegates,
+    beginProceduralMotionVote,
     archiveMotionQueue,
     addDocument,
     updateDocument,
     promoteToDraftResolution,
+    addAmendment,
+    updateAmendment,
+    addSponsor,
     addSpeakingEvent,
     addPoint,
     resolvePoint,
-    updateRubricScore,
-    signScores,
-    updatePositionPaperScore,
-    setVcRecipient,
+    setPointRuling,
+    startAppeal,
+    resolveAppeal,
+    setAgendaAdopted,
+    setSpeakingTime,
+    setGeneralDebateQueue,
+    archiveAndClearSpeakersList,
+    setFloorAllotment,
+    setAmendmentPeriod,
+    clearAmendmentPeriod,
+    setCaucusSpeakerQueue,
+    advanceCaucusSpeaker,
+    setCaucusSpeakOrder,
+    startModeratedCaucus,
+    clearActiveCaucus,
+    clearSuspension,
+    openVote,
+    openAmendmentVote,
+    patchVoteContext,
+    clearVoteContext,
   };
 }

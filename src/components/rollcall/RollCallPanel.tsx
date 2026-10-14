@@ -7,16 +7,12 @@ import type { RollCallStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: RollCallStatus; label: string }[] = [
   { value: "present", label: "Present" },
-  { value: "present_voting", label: "Present & Voting" },
   { value: "absent", label: "Absent" },
 ];
 
 export function RollCallPanel() {
-  const {
-    activeCommittee,
-    startRollCall,
-    updateRollCallStatus,
-  } = useConference();
+  const { activeCommittee, startRollCall, updateRollCallStatus } =
+    useConference();
   const [label, setLabel] = useState("Opening Roll Call");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     activeCommittee?.rollCalls[0]?.id ?? null
@@ -30,9 +26,10 @@ export function RollCallPanel() {
   const visibleDelegates = useMemo(() => {
     if (!activeCommittee || !session) return [];
     if (!absentOnly) return activeCommittee.delegates;
-    return activeCommittee.delegates.filter(
-      (d) => (session.attendance[d.id] ?? "absent") === "absent"
-    );
+    return activeCommittee.delegates.filter((d) => {
+      const s = session.attendance[d.id] ?? "absent";
+      return s === "absent";
+    });
   }, [activeCommittee, session, absentOnly]);
 
   if (!activeCommittee) return null;
@@ -55,22 +52,25 @@ export function RollCallPanel() {
       ).length
     : 0;
 
+  const normalizeStatus = (status: RollCallStatus): RollCallStatus =>
+    status === "present_voting" ? "present" : status;
+
   return (
     <div className="space-y-4">
-      <Card title="Roll Call">
+      <Card title="Attendance">
         <div className="flex flex-wrap items-end gap-3">
           <Input
-            label="Session Label"
+            label="Session label"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             className="max-w-xs"
           />
-          <Button onClick={handleStart}>Start New Roll Call</Button>
+          <Button onClick={handleStart}>Start new roll call</Button>
         </div>
       </Card>
 
       {activeCommittee.rollCalls.length > 0 && (
-        <Card title="Roll Call Sessions">
+        <Card title="Roll call sessions">
           <div className="mb-4 flex flex-wrap gap-2">
             {activeCommittee.rollCalls.map((rc) => (
               <Button
@@ -112,7 +112,9 @@ export function RollCallPanel() {
 
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {visibleDelegates.map((d) => {
-                  const status = session.attendance[d.id] ?? "absent";
+                  const status = normalizeStatus(
+                    session.attendance[d.id] ?? "absent"
+                  );
                   return (
                     <div
                       key={d.id}
@@ -140,7 +142,9 @@ export function RollCallPanel() {
                 })}
               </div>
               {absentOnly && visibleDelegates.length === 0 && (
-                <p className="text-sm text-green-700">All delegates are present.</p>
+                <p className="text-sm text-green-700">
+                  All delegates are present.
+                </p>
               )}
             </>
           )}

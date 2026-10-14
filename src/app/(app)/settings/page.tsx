@@ -21,9 +21,9 @@ import { getCommitteeStats } from "@/lib/conference-stats";
 import type { Committee, CommitteeType } from "@/lib/types";
 
 const COMMITTEE_TYPE_OPTIONS = [
-  { value: "ga", label: "General Assembly (GA Rubric)" },
-  { value: "crisis", label: "Crisis (Crisis Rubric)" },
-  { value: "specialized", label: "Specialized (GA Rubric)" },
+  { value: "ga", label: "General Assembly" },
+  { value: "crisis", label: "Crisis" },
+  { value: "specialized", label: "Specialized" },
 ] as const;
 
 type CommitteeDraft = {
@@ -511,7 +511,7 @@ export default function SettingsPage() {
           if (confirmTypeChangeId) void handleSaveCommittee(confirmTypeChangeId);
         }}
         title="Change committee type"
-        message="Changing committee type resets rubric scores to match the new scoring model. Notes are kept. Continue?"
+        message="Changing committee type updates position-paper requirements for that committee type. Continue?"
         confirmLabel="Change type"
         variant="primary"
       />

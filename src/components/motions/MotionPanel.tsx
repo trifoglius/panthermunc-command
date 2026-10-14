@@ -2,31 +2,52 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
-import { MotionActiveSession } from "@/components/motions/MotionActiveSession";
-import { DocumentOrderField } from "@/components/motions/DocumentOrderField";
 import { PointsPanel } from "@/components/points/PointsPanel";
-import { MOTION_TYPES, VOTE_MANNERS } from "@/lib/constants";
-import { computeMotionDisruptivity } from "@/lib/motion-disruptivity";
-import { motionHasActiveSession } from "@/lib/motion-timers";
-import { parseDocumentOrder } from "@/lib/voting";
-import { isActiveDraftResolution, getSubmissionOrderIds } from "@/lib/documents";
+import { TimerDisplay } from "@/components/motions/TimerControls";
+import { MOTION_TYPES } from "@/lib/constants";
+import { isActiveDraftResolution } from "@/lib/documents";
+import {
+  addSpeakerWithReserve,
+  getMotionTypeId,
+  getTimerConfig,
+} from "@/lib/motion-timers";
+import { proceduralMotionPasses } from "@/lib/session-state";
+import { useSessionTimers } from "@/hooks/useSessionTimers";
 import type { MotionField } from "@/lib/constants";
 import { Badge, Button, Card, Input, Select, Tabs, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
+
+/** Auto-derive pass/fail from yes/no when any votes are cast; null leaves status unchanged. */
+function statusFromVotes(
+  votesFor: number,
+  votesAgainst: number
+): MotionStatus | null {
+  if (votesFor + votesAgainst === 0) return null;
+  return proceduralMotionPasses(votesFor, votesAgainst) ? "passed" : "failed";
+}
+
+function motionHasOpenableTimer(motion: Motion): boolean {
+  const config = getTimerConfig(motion);
+  if (!config) return false;
+  return (
+    (config.totalSeconds ?? 0) > 0 ||
+    (config.speakingSeconds ?? 0) > 0 ||
+    (config.phases?.some((p) => p.seconds > 0) ?? false)
+  );
+}
 
 export function MotionPanel() {
   const {
     activeCommittee,
     addMotion,
     updateMotion,
+    beginProceduralMotionVote,
     archiveMotionQueue,
   } = useConference();
   const [motionType, setMotionType] = useState<string>(MOTION_TYPES[0].id);
   const [proposedBy, setProposedBy] = useState("");
   const [details, setDetails] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
-  const [activeMotionId, setActiveMotionId] = useState<string | null>(null);
-  const [sessionMinimized, setSessionMinimized] = useState(false);
   const [motionSection, setMotionSection] = useState<"motions" | "points">(
     "motions"
   );
@@ -34,12 +55,9 @@ export function MotionPanel() {
   if (!activeCommittee) return null;
 
   const selectedMotion = MOTION_TYPES.find((m) => m.id === motionType)!;
-  const activeMotion = activeCommittee.motions.find(
-    (m) => m.id === activeMotionId
+  const draftResolutions = activeCommittee.documents.filter(
+    isActiveDraftResolution
   );
-
-  const draftResolutions = activeCommittee.documents.filter(isActiveDraftResolution);
-  const submissionOrderIds = getSubmissionOrderIds(activeCommittee);
 
   const visibleFields = selectedMotion.fields.filter((field) => {
     if (!field.showWhen) return true;
@@ -58,22 +76,6 @@ export function MotionPanel() {
           }
           rows={3}
         />
-      );
-    }
-
-    if (field.type === "document_order") {
-      return (
-        <div key={field.key} className="md:col-span-2">
-          <DocumentOrderField
-            label={field.label}
-            value={details[field.key] ?? ""}
-            onChange={(value) =>
-              setDetails({ ...details, [field.key]: value })
-            }
-            documents={draftResolutions}
-            submissionOrderIds={submissionOrderIds}
-          />
-        </div>
       );
     }
 
@@ -98,33 +100,15 @@ export function MotionPanel() {
     }
 
     if (field.type === "select") {
-      const fieldOptions = field.options ?? [];
-      const hasEmptyOption = fieldOptions.some((o) => o.value === "");
-      const options =
-        field.key === "vote_manner"
-          ? [
-              { value: "", label: "Select..." },
-              ...VOTE_MANNERS.map((v) => ({ value: v, label: v })),
-            ]
-          : hasEmptyOption
-            ? fieldOptions
-            : [{ value: "", label: "Select..." }, ...fieldOptions];
-
       return (
         <Select
           key={field.key}
           label={field.label}
-          value={details[field.key] ?? ""}
-          onChange={(e) => {
-            const value = e.target.value;
-            const next = { ...details, [field.key]: value };
-            if (field.key === "two_for_two_against" && value !== "yes") {
-              delete next.speaking_time;
-              delete next.speaker_order;
-            }
-            setDetails(next);
-          }}
-          options={options}
+          value={details[field.key] ?? field.options?.[0]?.value ?? ""}
+          onChange={(e) =>
+            setDetails({ ...details, [field.key]: e.target.value })
+          }
+          options={field.options ?? []}
         />
       );
     }
@@ -141,333 +125,550 @@ export function MotionPanel() {
     );
   };
 
-  const handleSubmit = () => {
+  const submit = () => {
     if (!proposedBy) return;
+    const detailsWithDefaults = { ...details };
+    for (const field of selectedMotion.fields) {
+      if (detailsWithDefaults[field.key] !== undefined) continue;
+      if (field.type === "select" && field.options?.[0]?.value) {
+        detailsWithDefaults[field.key] = field.options[0].value;
+      }
+    }
+    if (selectedMotion.id === "change_speaking_time") {
+      const seconds = Number(detailsWithDefaults.speaking_time);
+      if (!Number.isFinite(seconds) || seconds <= 0) return;
+    }
     addMotion({
       motionTypeId: selectedMotion.id,
       type: selectedMotion.label,
       proposedBy,
       status: "pending",
-      disruptivity: computeMotionDisruptivity(
-        selectedMotion.id,
-        selectedMotion.disruptivity,
-        details
-      ),
-      details,
-      notes,
+      disruptivity: 0,
+      details: detailsWithDefaults,
+      notes: notes.trim() || undefined,
     });
     setDetails({});
     setNotes("");
   };
 
-  const handleStatusChange = (motion: Motion, status: MotionStatus) => {
-    const updated = { ...motion, status };
-    updateMotion(updated);
-    if (status === "passed" && motionHasActiveSession(updated)) {
-      setActiveMotionId(motion.id);
-      setSessionMinimized(false);
-    }
-  };
+  const country = (id: string) =>
+    activeCommittee.delegates.find((d) => d.id === id)?.country ?? id;
 
-  const sortedMotions = [...activeCommittee.motions].sort(
-    (a, b) => b.disruptivity - a.disruptivity
+  const chronological = [...activeCommittee.motions].sort(
+    (a, b) =>
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
-  const passedMotions = sortedMotions.filter((m) => m.status === "passed");
-  const archiveTarget =
-    (activeMotionId && passedMotions.find((m) => m.id === activeMotionId)) ??
-    passedMotions[0];
-
-  const handleArchive = () => {
-    if (!archiveTarget) return;
-    archiveMotionQueue(archiveTarget.id);
-    setActiveMotionId(null);
-  };
-
-  const hasActiveSession =
-    !!activeMotion && activeMotion.status === "passed";
-
-  const sessionPanel =
-    hasActiveSession &&
-    (sessionMinimized ? (
-      <div className="flex items-center justify-between rounded-lg border border-purple-400 bg-purple-100 px-4 py-2">
-        <span className="text-sm font-medium text-purple-900">
-          Active session: {activeMotion.type}
-        </span>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => setSessionMinimized(false)}
-        >
-          Expand session
-        </Button>
-      </div>
-    ) : (
-      <MotionActiveSession
-        motion={activeMotion}
-        onDismiss={() => setSessionMinimized(true)}
-      />
-    ));
-
-  const panelBody = (
-    <>
+  return (
+    <div className="space-y-4">
       <Tabs
         tabs={[
           { id: "motions", label: "Motions" },
-          { id: "points", label: "Points" },
+          { id: "points", label: "Points of order" },
         ]}
         activeId={motionSection}
         onChange={(id) => setMotionSection(id as "motions" | "points")}
-        ariaLabel="Motions section"
+        ariaLabel="Motions and points"
       />
 
       {motionSection === "points" ? (
         <PointsPanel />
       ) : (
         <>
-          <Card title="Propose Motion">
-        <div className="grid gap-3 md:grid-cols-2">
-          <Select
-            label="Motion Type"
-            value={motionType}
-            onChange={(e) => {
-              setMotionType(e.target.value);
-              setDetails({});
-            }}
-            options={MOTION_TYPES.map((m) => ({
-              value: m.id,
-              label: m.label,
-            }))}
-          />
-          <Select
-            label="Proposed By"
-            value={proposedBy}
-            onChange={(e) => setProposedBy(e.target.value)}
-            options={[
-              { value: "", label: "Select country..." },
-              ...activeCommittee.delegates.map((d) => ({
-                value: d.id,
-                label: d.country,
-              })),
-            ]}
-          />
-        </div>
-
-        {visibleFields.length > 0 && (
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {visibleFields.map((field) => renderMotionField(field))}
-          </div>
-        )}
-
-        <div className="mt-3">
-          <Textarea
-            label="Notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-          />
-        </div>
-
-        <div className="mt-3">
-          <Button onClick={handleSubmit} disabled={!proposedBy}>
-            Log Motion
-          </Button>
-        </div>
-      </Card>
-
-      <Card title="Motion Queue">
-        {passedMotions.length > 0 && sortedMotions.length > 0 && (
-          <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3">
-            <p className="text-sm text-green-900">
-              A motion has passed
-              {archiveTarget ? `: ${archiveTarget.type}` : ""}. When finished,
-              archive this queue to save it to Motion Queues and start fresh.
-            </p>
-            <Button className="mt-2" onClick={handleArchive}>
-              Archive Queue &amp; Clear
-            </Button>
-          </div>
-        )}
-
-        {sortedMotions.length === 0 ? (
-          <p className="text-sm text-purple-600">No motions logged yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {sortedMotions.map((motion) => (
-              <MotionRow
-                key={motion.id}
-                motion={motion}
-                committee={activeCommittee}
-                isActive={activeMotionId === motion.id}
-                onStatusChange={handleStatusChange}
-                onUpdate={updateMotion}
-                onOpenSession={() => {
-                  setActiveMotionId(motion.id);
-                  setSessionMinimized(false);
+          <Card title="Log motion">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Select
+                label="Motion"
+                value={motionType}
+                onChange={(e) => {
+                  setMotionType(e.target.value);
+                  setDetails({});
                 }}
+                options={MOTION_TYPES.map((m) => ({
+                  value: m.id,
+                  label: m.label,
+                }))}
               />
-            ))}
-          </div>
-        )}
-      </Card>
+              <Select
+                label="Proposed by"
+                value={proposedBy}
+                onChange={(e) => setProposedBy(e.target.value)}
+                options={[
+                  { value: "", label: "Select..." },
+                  ...activeCommittee.delegates.map((d) => ({
+                    value: d.id,
+                    label: d.country,
+                  })),
+                ]}
+              />
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {visibleFields.map(renderMotionField)}
+            </div>
+            <div className="mt-3">
+              <Textarea
+                label="Notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+            <div className="mt-3">
+              <Button
+                onClick={submit}
+                disabled={
+                  !proposedBy ||
+                  (selectedMotion.id === "change_speaking_time" &&
+                    !(Number(details.speaking_time) > 0))
+                }
+              >
+                Log motion
+              </Button>
+            </div>
+          </Card>
+
+          <Card title="Motion log">
+            {chronological.length === 0 ? (
+              <p className="text-sm text-purple-600">No motions logged.</p>
+            ) : (
+              <ul className="space-y-3">
+                {chronological.map((motion) => (
+                  <MotionRow
+                    key={motion.id}
+                    motion={motion}
+                    proposer={country(motion.proposedBy)}
+                    onUpdate={updateMotion}
+                    onBeginProceduralVote={() =>
+                      beginProceduralMotionVote(motion)
+                    }
+                    onArchive={() => archiveMotionQueue(motion.id)}
+                  />
+                ))}
+              </ul>
+            )}
+          </Card>
         </>
       )}
-    </>
-  );
-
-  return (
-    <div className="space-y-4">
-      {hasActiveSession ? sessionPanel : null}
-      {panelBody}
     </div>
   );
 }
 
 function MotionRow({
   motion,
-  committee,
-  isActive,
-  onStatusChange,
+  proposer,
   onUpdate,
-  onOpenSession,
+  onBeginProceduralVote,
+  onArchive,
 }: {
   motion: Motion;
-  committee: NonNullable<ReturnType<typeof useConference>["activeCommittee"]>;
-  isActive: boolean;
-  onStatusChange: (motion: Motion, status: MotionStatus) => void;
+  proposer: string;
   onUpdate: (m: Motion) => void;
-  onOpenSession: () => void;
+  onBeginProceduralVote: () => void;
+  onArchive: () => void;
 }) {
-  const proposer = committee.delegates.find((d) => d.id === motion.proposedBy);
-  const hasActiveSession = motionHasActiveSession(motion);
-  const statusColors: Record<MotionStatus, "yellow" | "green" | "red" | "gray"> =
-    {
-      pending: "yellow",
-      passed: "green",
-      failed: "red",
-      withdrawn: "gray",
-    };
+  const {
+    activeCommittee,
+    startModeratedCaucus,
+  } = useConference();
+  const [timerOpen, setTimerOpen] = useState(false);
+
+  const typeId = getMotionTypeId(motion);
+  const isModerated = typeId === "moderated_caucus";
+  const isChangeSpeakingTime = typeId === "change_speaking_time";
+  const isProceduralDebateMotion =
+    typeId === "division_question" || typeId === "competence";
+  const activeCaucus = activeCommittee?.sessionState?.activeCaucus;
+  const speakingTime = activeCommittee?.sessionState?.speakingTime;
+  const voteCtx = activeCommittee?.sessionState?.voteContext;
+  const proceduralVoteOpen =
+    isProceduralDebateMotion &&
+    (voteCtx?.target.type === "division" ||
+      voteCtx?.target.type === "competence") &&
+    voteCtx.target.id === motion.id;
+  const caucusActive =
+    isModerated &&
+    motion.status === "passed" &&
+    activeCaucus?.motionId === motion.id;
+  const canOpenTimer =
+    motion.status === "passed" &&
+    !isModerated &&
+    !isProceduralDebateMotion &&
+    motionHasOpenableTimer(motion);
+
+  const statusColor =
+    motion.status === "passed"
+      ? "green"
+      : motion.status === "failed"
+        ? "red"
+        : "gray";
 
   return (
-    <div
-      className={`rounded-md border p-3 ${
-        isActive ? "border-purple-400 bg-purple-50" : "border-purple-100"
-      }`}
-    >
+    <li className="rounded-lg border border-purple-100 p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="font-semibold text-purple-900">{motion.type}</p>
+          <p className="font-medium text-purple-900">{motion.type}</p>
           <p className="text-sm text-purple-600">
-            {proposer?.country ?? "Unknown"} ·{" "}
-            {new Date(motion.timestamp).toLocaleString()} · Disruptivity:{" "}
-            {motion.disruptivity}
+            {proposer} · {new Date(motion.timestamp).toLocaleString()}
           </p>
-          {Object.entries(motion.details).map(([k, v]) => {
-            if (!v) return null;
-            let display = v;
-            if (k === "resolution") {
-              const doc = committee.documents.find((d) => d.id === v);
-              display = doc?.title ?? v;
-            } else if (k === "presentation_order" || k === "paper_order") {
-              display = parseDocumentOrder(v)
-                .map((id, i) => {
-                  const doc = committee.documents.find((d) => d.id === id);
-                  return `${i + 1}. ${doc?.title ?? id}`;
+        </div>
+        <Badge color={statusColor}>{motion.status}</Badge>
+      </div>
+      {Object.keys(motion.details).length > 0 && (
+        <dl className="mt-2 grid gap-1 text-sm text-purple-700 sm:grid-cols-2">
+          {Object.entries(motion.details).map(([k, v]) =>
+            v ? (
+              <div key={k}>
+                <span className="text-purple-500">{k}: </span>
+                {v}
+              </div>
+            ) : null
+          )}
+        </dl>
+      )}
+      {isChangeSpeakingTime &&
+        motion.status === "passed" &&
+        speakingTime && (
+          <p className="mt-2 text-sm text-green-800">
+            Speaking time now: {speakingTime.speakingSec}s
+          </p>
+        )}
+      {isProceduralDebateMotion ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm text-purple-700">
+            Two speakers for and against the motion, then vote on the motion
+            {typeId === "competence"
+              ? " before any vote on the proposal"
+              : " before voting divided parts"}
+            . Use the Voting tab — do not enter tallies here first.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <Select
+              label="Status"
+              value={motion.status}
+              onChange={(e) =>
+                onUpdate({
+                  ...motion,
+                  status: e.target.value as MotionStatus,
                 })
-                .join("; ");
-            } else if (k === "speak_order") {
-              display =
-                v === "first"
-                  ? "Speak first"
-                  : v === "last"
-                    ? "Speak last"
-                    : v;
-            } else if (k === "speaker_order") {
-              display =
-                v === "against_first"
-                  ? "Against first, then alternate"
-                  : v === "for_first"
-                    ? "For first, then alternate"
-                    : v;
-            } else if (k === "amendment_type") {
-              display = v === "friendly" ? "Friendly" : v === "unfriendly" ? "Unfriendly" : v;
-            } else if (k === "two_for_two_against") {
-              display = v === "yes" ? "Yes" : v === "no" ? "No" : v;
-            }
-            return (
-              <p key={k} className="text-sm text-purple-700">
-                {k.replace(/_/g, " ")}: {display}
-              </p>
-            );
-          })}
-          {motion.notes && (
-            <p className="text-sm italic text-purple-600">{motion.notes}</p>
+              }
+              options={[
+                { value: "pending", label: "Pending" },
+                { value: "passed", label: "Passed" },
+                { value: "failed", label: "Failed" },
+                { value: "withdrawn", label: "Withdrawn" },
+              ]}
+              className="max-w-[10rem]"
+            />
+            {motion.status === "pending" && !proceduralVoteOpen && (
+              <Button size="sm" onClick={onBeginProceduralVote}>
+                Open procedural vote
+              </Button>
+            )}
+            {proceduralVoteOpen && (
+              <Badge color="purple">Open in Voting tab</Badge>
+            )}
+            {(motion.status === "passed" || motion.status === "failed") && (
+              <Button size="sm" variant="secondary" onClick={onArchive}>
+                Archive log after this motion
+              </Button>
+            )}
+          </div>
+          {(motion.votesFor != null ||
+            motion.votesAgainst != null ||
+            motion.votesAbstain != null) && (
+            <p className="text-sm text-purple-600">
+              Tallies from Voting: Yes {motion.votesFor ?? 0} · No{" "}
+              {motion.votesAgainst ?? 0} · Abstain {motion.votesAbstain ?? 0}
+            </p>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge color={statusColors[motion.status]}>{motion.status}</Badge>
-          {hasActiveSession && motion.status === "passed" && (
-            <Button size="sm" variant="secondary" onClick={onOpenSession}>
-              Open Session
-            </Button>
+      ) : (
+        <>
+          <div className="mt-3 grid gap-2 sm:grid-cols-4">
+            <Input
+              label="Yes"
+              type="number"
+              value={motion.votesFor ?? ""}
+              onChange={(e) => {
+                const votesFor = Number(e.target.value) || 0;
+                const votesAgainst = motion.votesAgainst ?? 0;
+                const autoStatus = statusFromVotes(votesFor, votesAgainst);
+                onUpdate({
+                  ...motion,
+                  votesFor,
+                  ...(autoStatus ? { status: autoStatus } : {}),
+                });
+              }}
+            />
+            <Input
+              label="No"
+              type="number"
+              value={motion.votesAgainst ?? ""}
+              onChange={(e) => {
+                const votesAgainst = Number(e.target.value) || 0;
+                const votesFor = motion.votesFor ?? 0;
+                const autoStatus = statusFromVotes(votesFor, votesAgainst);
+                onUpdate({
+                  ...motion,
+                  votesAgainst,
+                  ...(autoStatus ? { status: autoStatus } : {}),
+                });
+              }}
+            />
+            <Input
+              label="Abstain"
+              type="number"
+              value={motion.votesAbstain ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  ...motion,
+                  votesAbstain: Number(e.target.value) || 0,
+                })
+              }
+            />
+            <Select
+              label="Status"
+              value={motion.status}
+              onChange={(e) =>
+                onUpdate({
+                  ...motion,
+                  status: e.target.value as MotionStatus,
+                })
+              }
+              options={[
+                { value: "pending", label: "Pending" },
+                { value: "passed", label: "Passed" },
+                { value: "failed", label: "Failed" },
+                { value: "withdrawn", label: "Withdrawn" },
+              ]}
+            />
+          </div>
+          {motion.status === "passed" && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {isModerated && !caucusActive && (
+                <Button size="sm" onClick={() => startModeratedCaucus(motion)}>
+                  Open moderated caucus
+                </Button>
+              )}
+              {canOpenTimer && (
+                <Button
+                  size="sm"
+                  onClick={() => setTimerOpen((open) => !open)}
+                >
+                  {timerOpen ? "Close timer" : "Open timer"}
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" onClick={onArchive}>
+                Archive log after this motion
+              </Button>
+            </div>
           )}
+        </>
+      )}
+      {caucusActive && activeCaucus && (
+        <div className="mt-3">
+          <ModeratedCaucusSession motion={motion} />
+        </div>
+      )}
+      {timerOpen && canOpenTimer && (
+        <div className="mt-3">
+          <PassedMotionTimer motion={motion} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ModeratedCaucusSession({ motion }: { motion: Motion }) {
+  const {
+    activeCommittee,
+    setCaucusSpeakerQueue,
+    advanceCaucusSpeaker,
+    setCaucusSpeakOrder,
+    clearActiveCaucus,
+    addSpeakingEvent,
+  } = useConference();
+  const [addId, setAddId] = useState("");
+  const [sessionOpen, setSessionOpen] = useState(true);
+
+  const caucus = activeCommittee?.sessionState?.activeCaucus;
+  const config = getTimerConfig(motion);
+  const timers = useSessionTimers(
+    config?.totalSeconds ?? caucus?.totalSec ?? 0,
+    config?.speakingSeconds ?? caucus?.speakingSec ?? 0
+  );
+
+  if (!activeCommittee || !caucus) return null;
+
+  const country = (id: string) =>
+    activeCommittee.delegates.find((d) => d.id === id)?.country ?? id;
+
+  const addSpeaker = () => {
+    if (!addId) return;
+    const next = addSpeakerWithReserve(
+      caucus.speakerQueue,
+      addId,
+      caucus.proposedBy,
+      caucus.speakOrder,
+      0
+    );
+    setCaucusSpeakerQueue(next);
+    setAddId("");
+  };
+
+  const removeSpeaker = (index: number) => {
+    setCaucusSpeakerQueue(caucus.speakerQueue.filter((_, i) => i !== index));
+  };
+
+  const moveSpeaker = (index: number, dir: -1 | 1) => {
+    const j = index + dir;
+    if (j < 0 || j >= caucus.speakerQueue.length) return;
+    const swapped = [...caucus.speakerQueue];
+    [swapped[index], swapped[j]] = [swapped[j], swapped[index]];
+    setCaucusSpeakerQueue(swapped);
+  };
+
+  return (
+    <div className="rounded-lg border border-purple-200 bg-purple-50/50 p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium text-purple-900">
+          Moderated caucus
+          {caucus.topic ? ` — ${caucus.topic}` : ""}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setSessionOpen((o) => !o)}
+          >
+            {sessionOpen ? "Hide session" : "Show session"}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={clearActiveCaucus}>
+            End caucus
+          </Button>
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {(["pending", "passed", "failed", "withdrawn"] as MotionStatus[]).map(
-          (s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={motion.status === s ? "primary" : "secondary"}
-              onClick={() => onStatusChange(motion, s)}
-            >
-              {s}
+      {sessionOpen && (
+        <div className="space-y-3">
+          <Select
+            label="Proposer speaks"
+            value={caucus.speakOrder ?? "none"}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCaucusSpeakOrder(
+                value === "first" || value === "last" ? value : undefined
+              );
+            }}
+            options={[
+              { value: "none", label: "No reserve" },
+              { value: "first", label: "First" },
+              { value: "last", label: "Last" },
+            ]}
+            className="max-w-xs"
+          />
+
+          <div className="flex flex-wrap items-end gap-2">
+            <Select
+              label="Add speaker"
+              value={addId}
+              onChange={(e) => setAddId(e.target.value)}
+              options={[
+                { value: "", label: "Select..." },
+                ...activeCommittee.delegates
+                  .filter((d) => !caucus.speakerQueue.includes(d.id))
+                  .map((d) => ({ value: d.id, label: d.country })),
+              ]}
+              className="min-w-[12rem] flex-1"
+            />
+            <Button onClick={addSpeaker} disabled={!addId}>
+              Add
             </Button>
-          )
-        )}
-        <Input
-          type="number"
-          placeholder="For"
-          className="max-w-20"
-          value={motion.votesFor ?? ""}
-          onChange={(e) =>
-            onUpdate({
-              ...motion,
-              votesFor: e.target.value ? Number(e.target.value) : undefined,
-            })
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Against"
-          className="max-w-20"
-          value={motion.votesAgainst ?? ""}
-          onChange={(e) =>
-            onUpdate({
-              ...motion,
-              votesAgainst: e.target.value
-                ? Number(e.target.value)
-                : undefined,
-            })
-          }
-        />
-        <Input
-          type="number"
-          placeholder="Abstain"
-          className="max-w-20"
-          value={motion.votesAbstain ?? ""}
-          onChange={(e) =>
-            onUpdate({
-              ...motion,
-              votesAbstain: e.target.value
-                ? Number(e.target.value)
-                : undefined,
-            })
-          }
-        />
-      </div>
+          </div>
+
+          {caucus.speakerQueue.length === 0 ? (
+            <p className="text-sm text-purple-600">
+              No speakers yet. Add delegates to the caucus list.
+            </p>
+          ) : (
+            <ol className="space-y-2">
+              {caucus.speakerQueue.map((id, index) => (
+                <li
+                  key={`${id}-${index}`}
+                  className="flex flex-wrap items-center gap-2 rounded border border-purple-100 bg-white px-3 py-2 text-sm"
+                >
+                  <span className="w-6 text-purple-500">{index + 1}.</span>
+                  <span className="font-medium text-purple-900">
+                    {country(id)}
+                  </span>
+                  {id === caucus.proposedBy && caucus.speakOrder ? (
+                    <Badge color="purple">Reserved {caucus.speakOrder}</Badge>
+                  ) : null}
+                  <div className="ml-auto flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveSpeaker(index, -1)}
+                      disabled={index === 0}
+                    >
+                      Up
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => moveSpeaker(index, 1)}
+                      disabled={index === caucus.speakerQueue.length - 1}
+                    >
+                      Down
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removeSpeaker(index)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {caucus.speakerQueue[0] && (
+            <Button
+              size="sm"
+              onClick={() => {
+                const speaker = caucus.speakerQueue[0];
+                addSpeakingEvent({
+                  delegateId: speaker,
+                  eventType: "moderated_caucus",
+                  durationSeconds: caucus.speakingSec,
+                });
+                advanceCaucusSpeaker();
+                timers.resetSpeaking(caucus.speakingSec);
+              }}
+            >
+              Log speech &amp; advance ({country(caucus.speakerQueue[0])})
+            </Button>
+          )}
+
+          {config && (
+            <TimerDisplay config={config} motion={motion} timers={timers} />
+          )}
+        </div>
+      )}
     </div>
   );
+}
+
+function PassedMotionTimer({ motion }: { motion: Motion }) {
+  const config = getTimerConfig(motion);
+  const timers = useSessionTimers(
+    config?.totalSeconds ?? 0,
+    config?.speakingSeconds ?? 0
+  );
+
+  if (!config) return null;
+
+  return <TimerDisplay config={config} motion={motion} timers={timers} />;
 }

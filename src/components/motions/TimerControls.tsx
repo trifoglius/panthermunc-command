@@ -18,9 +18,11 @@ export function TimerCard({
   onStart,
   onPause,
   onReset,
+  onClose,
   startDisabled,
   startLabel,
   hint,
+  size = "md",
 }: {
   label: string;
   seconds: number;
@@ -28,16 +30,23 @@ export function TimerCard({
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
+  /** When time has elapsed, replace Start/Resume with Close. */
+  onClose?: () => void;
   startDisabled?: boolean;
   startLabel: string;
   hint?: string;
+  size?: "md" | "lg";
 }) {
   const isLow = seconds > 0 && seconds <= 10;
   const isDone = seconds === 0;
+  const isLarge = size === "lg";
+  const showClose = isDone && !running && !!onClose;
 
   return (
     <div
-      className={`rounded-lg border p-4 text-center ${
+      className={`rounded-lg border text-center ${
+        isLarge ? "p-6 sm:p-8" : "p-4"
+      } ${
         isDone
           ? "border-red-300 bg-red-50"
           : isLow
@@ -45,20 +54,34 @@ export function TimerCard({
             : "border-purple-200 bg-purple-50"
       }`}
     >
-      <p className="text-sm font-medium text-purple-800">{label}</p>
       <p
-        className={`mt-1 text-4xl font-bold tabular-nums ${
-          isDone ? "text-red-700" : "text-purple-900"
+        className={`font-medium text-purple-800 ${
+          isLarge ? "text-base sm:text-lg" : "text-sm"
         }`}
+      >
+        {label}
+      </p>
+      <p
+        className={`mt-1 font-bold tabular-nums ${
+          isLarge
+            ? "text-6xl sm:text-7xl md:text-8xl"
+            : "text-4xl"
+        } ${isDone ? "text-red-700" : "text-purple-900"}`}
       >
         {formatTime(seconds)}
       </p>
       {hint && <p className="mt-1 text-xs text-purple-600">{hint}</p>}
-      <div className="mt-3 flex justify-center gap-2">
+      <div className={`mt-3 flex justify-center gap-2 ${isLarge ? "mt-5" : ""}`}>
         {!running ? (
-          <Button size="md" onClick={onStart} disabled={startDisabled}>
-            {startLabel}
-          </Button>
+          showClose ? (
+            <Button size="md" onClick={onClose}>
+              Close
+            </Button>
+          ) : (
+            <Button size="md" onClick={onStart} disabled={startDisabled || isDone}>
+              {startLabel}
+            </Button>
+          )
         ) : (
           <Button size="md" variant="secondary" onClick={onPause}>
             Pause
@@ -144,6 +167,19 @@ export function TimerDisplay({
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
+      {hasSpeaking && (
+        <TimerCard
+          label="Speaking Time"
+          seconds={timers.speakingSeconds}
+          running={timers.mode === "speaking"}
+          onStart={timers.startSpeaking}
+          onPause={timers.pause}
+          onReset={() => timers.resetSpeaking()}
+          onClose={() => timers.resetSpeaking()}
+          startDisabled={timers.speakingSeconds === 0}
+          startLabel="Start Speaking"
+        />
+      )}
       {hasTotal && (
         <TimerCard
           label="Total Time"
@@ -154,21 +190,6 @@ export function TimerDisplay({
           onReset={() => timers.resetTotal()}
           startDisabled={timers.totalSeconds === 0}
           startLabel="Start Total"
-        />
-      )}
-      {hasSpeaking && (
-        <TimerCard
-          label="Speaking Time"
-          seconds={timers.speakingSeconds}
-          running={timers.mode === "speaking"}
-          onStart={timers.startSpeaking}
-          onPause={timers.pause}
-          onReset={() => timers.resetSpeaking()}
-          startDisabled={timers.speakingSeconds === 0}
-          startLabel="Start Speaking"
-          hint={
-            hasTotal ? "Speaking time depletes total time." : undefined
-          }
         />
       )}
     </div>

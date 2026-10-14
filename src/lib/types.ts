@@ -1,5 +1,6 @@
 export type CommitteeType = "ga" | "crisis" | "specialized";
 export type PositionPaperStatus = "epp" | "lpp" | "none";
+/** Legacy `present_voting` kept for old roll-call data; new UI uses present | absent only. */
 export type RollCallStatus = "present" | "present_voting" | "absent";
 export type MotionStatus = "pending" | "passed" | "failed" | "withdrawn";
 export type DocumentType = "working_paper" | "draft_resolution" | "resolution";
@@ -8,9 +9,33 @@ export type DocumentStatus =
   | "submitted"
   | "presented"
   | "adopted"
-  | "failed";
+  | "failed"
+  | "withdrawn";
+/** Legacy privilege/inquiry kept for old point logs; new UI uses order only. */
 export type PointType = "order" | "privilege" | "inquiry";
-export type ScorerRole = "judge" | "dais";
+/** @deprecated Legacy national/bloc capacity; no longer used. */
+export type SpeakingCapacity = "national" | "bloc";
+export type SessionPhaseHint =
+  | "idle"
+  | "debate"
+  | "caucus"
+  | "amendment_period"
+  | "voting"
+  | "suspended"
+  | "adjourned";
+/** `placard` kept for older session JSON; treat as recorded. */
+export type VoteMode = "consensus" | "recorded" | "placard";
+export type FloorAllotmentKind =
+  | "draft_intro"
+  | "amendment_intro"
+  | "eov_before"
+  | "eov_after"
+  | "general_debate"
+  | "moderated_caucus"
+  | "other";
+export type AppealStatus = "none" | "pending" | "sustained" | "overruled";
+export type DivisionPartStatus = "pending" | "approved" | "rejected";
+export type CompetenceStatus = "pending" | "competent" | "not_competent";
 
 export interface Delegate {
   id: string;
@@ -34,6 +59,7 @@ export interface Motion {
   proposedBy: string;
   timestamp: string;
   status: MotionStatus;
+  /** Legacy field; unused (defaults to 0). */
   disruptivity: number;
   details: Record<string, string>;
   votesFor?: number;
@@ -44,11 +70,25 @@ export interface Motion {
 
 export interface Amendment {
   id: string;
-  clause: string;
-  language: string;
+  title?: string;
+  /** Change clauses / operatives (list supports division of the question). */
+  clauses?: string[];
+  /** @deprecated Prefer `clauses`. Kept for older saved sessions. */
+  clause?: string;
+  /** @deprecated Prefer amendment `link`; kept for older saved sessions. */
+  language?: string;
+  link?: string;
   amendmentType: "friendly" | "unfriendly";
-  status: "pending" | "incorporated" | "failed";
+  status:
+    | "pending"
+    | "submitted"
+    | "presented"
+    | "incorporated"
+    | "failed"
+    | "withdrawn";
   proposedBy: string;
+  sponsors?: string[];
+  submittedAt?: string;
 }
 
 export interface Document {
@@ -57,7 +97,9 @@ export interface Document {
   type: DocumentType;
   status: DocumentStatus;
   sponsors: string[];
+  /** Legacy; unused. */
   signatories: string[];
+  /** Legacy; unused. */
   authorPanel: string[];
   content: string;
   link?: string;
@@ -83,21 +125,11 @@ export interface Point {
   description: string;
   timestamp: string;
   resolved: boolean;
-}
-
-export interface RubricScore {
-  delegateId: string;
-  scores: Record<string, number>;
-  total: number;
-  notes: string;
-  signed: boolean;
-  signedAt?: string;
-}
-
-export interface PositionPaperScore {
-  delegateId: string;
-  score: number;
-  notes: string;
+  chairRuling?: string;
+  appealStatus?: AppealStatus;
+  appealVotesFor?: number;
+  appealVotesAgainst?: number;
+  appealVotesAbstain?: number;
 }
 
 export type DelegatePaperVote = "yes" | "no" | "abstain";
@@ -132,6 +164,127 @@ export interface MotionQueueSnapshot {
   qaDelegates?: string[];
 }
 
+export interface VoteTarget {
+  type:
+    | "document"
+    | "amendment"
+    | "motion"
+    | "appeal"
+    | "competence"
+    /** Vote on the motion to divide, before part votes. */
+    | "division"
+    | "division_part"
+    | "division_whole";
+  id: string;
+  parentDocumentId?: string;
+  partLabel?: string;
+}
+
+export interface DivisionPart {
+  id: string;
+  label: string;
+  status: DivisionPartStatus;
+}
+
+export interface VoteContext {
+  target: VoteTarget;
+  mode: VoteMode;
+  eov: {
+    beforeOpen: boolean;
+    afterOpen: boolean;
+    beforeSpeakers: string[];
+    afterSpeakers: string[];
+    timeLimitSec?: number;
+  };
+  speakersFor?: string[];
+  speakersAgainst?: string[];
+  division?: {
+    parts: DivisionPart[];
+    wholeStatus?: DivisionPartStatus;
+  };
+  competence?: {
+    motionId?: string;
+    status: CompetenceStatus;
+    documentId: string;
+  };
+  tallies?: { yes: number; no: number; abstain: number };
+  recordedVotes?: Record<string, DelegatePaperVote>;
+  votingStarted?: boolean;
+  resultApplied?: boolean;
+}
+
+export interface FloorAllotment {
+  kind: FloorAllotmentKind;
+  documentId?: string;
+  amendmentId?: string;
+  delegateId: string;
+  allottedSec: number;
+  startedAt?: string;
+  /** @deprecated Legacy field from national/bloc era. */
+  capacity?: SpeakingCapacity;
+}
+
+export interface SpeakersListSnapshot {
+  id: string;
+  label: string;
+  savedAt: string;
+  speakerQueue: string[];
+  currentIndex: number;
+  speakingSec?: number;
+  agendaTopic?: string;
+}
+
+export interface ActiveCaucus {
+  motionId: string;
+  topic: string;
+  totalSec: number;
+  speakingSec: number;
+  /** Remaining speakers, in order. */
+  speakerQueue: string[];
+  /** Speakers who already spoke (advanced off the queue), in order. */
+  completedSpeakers?: string[];
+  proposedBy: string;
+  speakOrder?: "first" | "last";
+  startedAt?: string;
+}
+
+export interface CommitteeSessionState {
+  phase: SessionPhaseHint;
+  agenda: {
+    topic: string;
+    adopted: boolean;
+    adoptedAt?: string;
+  };
+  speakingTime: {
+    speakingSec: number;
+  };
+  generalDebate: {
+    open: boolean;
+    speakerQueue: string[];
+    currentIndex: number;
+  };
+  floorAllotment?: FloorAllotment;
+  amendmentPeriod?: {
+    documentId: string;
+    totalSec: number;
+    endsAt?: string;
+    active: boolean;
+  };
+  voteContext?: VoteContext;
+  activeCaucus?: ActiveCaucus;
+  suspension?: {
+    durationSec: number;
+    endsAt?: string;
+    active: boolean;
+  };
+  openAppeal?: {
+    pointId: string;
+    chairRuling: string;
+    status: "pending" | "sustained" | "overruled";
+    votes?: { yes: number; no: number; abstain: number };
+  };
+}
+
 export interface Committee {
   id: string;
   name: string;
@@ -141,15 +294,14 @@ export interface Committee {
   rollCalls: RollCallSession[];
   motions: Motion[];
   motionQueueHistory?: MotionQueueSnapshot[];
+  /** Archived general speakers lists (cleared lists saved for the record). */
+  speakerListHistory?: SpeakersListSnapshot[];
+  /** Legacy per-motion session bags; retained for history/export of old data. */
   motionSessionState?: Record<string, MotionSessionState>;
+  sessionState?: CommitteeSessionState;
   documents: Document[];
   speakingEvents: SpeakingEvent[];
   points: Point[];
-  judgeScores: RubricScore[];
-  daisScores: RubricScore[];
-  positionPaperScores: PositionPaperScore[];
-  vcRecipientId?: string;
-  discrepancyThreshold: number;
   requirePositionPapers: boolean;
   nextDraftSubmissionOrder?: number;
   createdAt: string;
@@ -174,14 +326,7 @@ export interface DelegateStats {
   documentsSponsored: number;
   documentsSigned: number;
   pointsRaised: number;
-  judgeScore?: number;
-  daisScore?: number;
-  compositeScore?: number;
-  absoluteDifference?: number;
-  rank?: number;
-  positionPaperScore?: number;
   positionPaperStatus: PositionPaperStatus;
-  specialCircumstance?: "discrepancy" | "tie" | "both";
 }
 
 export interface NotificationItem {

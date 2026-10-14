@@ -2,50 +2,49 @@
 
 import { useState } from "react";
 import { useConference } from "@/context/ConferenceContext";
-import { Badge, Button, Card, Select, Textarea } from "@/components/ui";
-import type { PointType } from "@/lib/types";
+import { Badge, Button, Card, Input, Select, Textarea } from "@/components/ui";
 
 export function PointsPanel() {
-  const { activeCommittee, addPoint, resolvePoint } = useConference();
-  const [pointType, setPointType] = useState<PointType>("inquiry");
+  const {
+    activeCommittee,
+    addPoint,
+    resolvePoint,
+    setPointRuling,
+    startAppeal,
+    resolveAppeal,
+  } = useConference();
   const [pointDelegate, setPointDelegate] = useState("");
   const [pointDesc, setPointDesc] = useState("");
+  const [rulingDraft, setRulingDraft] = useState<Record<string, string>>({});
+  const [appealVotes, setAppealVotes] = useState<
+    Record<string, { yes: string; no: string; abstain: string }>
+  >({});
 
   if (!activeCommittee) return null;
 
   const logPoint = () => {
     if (!pointDelegate || !pointDesc.trim()) return;
     addPoint({
-      type: pointType,
+      type: "order",
       delegateId: pointDelegate,
       description: pointDesc.trim(),
     });
     setPointDesc("");
   };
 
+  const country = (id: string) =>
+    activeCommittee.delegates.find((d) => d.id === id)?.country ?? id;
+
   const unresolved = activeCommittee.points.filter((p) => !p.resolved);
   const resolved = activeCommittee.points.filter((p) => p.resolved);
 
   return (
-    <Card title="Points">
+    <Card title="Points of order">
       <p className="mb-3 text-sm text-purple-700">
-        Record points of order, personal privilege, and inquiry raised during
-        committee.
+        Record points of order. The Chair decides immediately; rulings may be
+        appealed and put to a vote.
       </p>
       <div className="grid gap-3 md:grid-cols-2">
-        <Select
-          label="Point Type"
-          value={pointType}
-          onChange={(e) => setPointType(e.target.value as PointType)}
-          options={[
-            { value: "order", label: "Point of Order" },
-            {
-              value: "privilege",
-              label: "Point of Personal Privilege",
-            },
-            { value: "inquiry", label: "Point of Inquiry" },
-          ]}
-        />
         <Select
           label="Delegate"
           value={pointDelegate}
@@ -70,29 +69,127 @@ export function PointsPanel() {
       </div>
       <div className="mt-3">
         <Button onClick={logPoint} disabled={!pointDelegate || !pointDesc.trim()}>
-          Log Point
+          Log point of order
         </Button>
       </div>
 
       {unresolved.length > 0 && (
         <div className="mt-6 border-t border-purple-200 pt-4">
           <h3 className="mb-3 text-sm font-semibold text-purple-900">
-            Open Points ({unresolved.length})
+            Open ({unresolved.length})
           </h3>
-          <ul className="space-y-2">
+          <ul className="space-y-4">
             {unresolved.map((p) => {
-              const d = activeCommittee.delegates.find(
-                (x) => x.id === p.delegateId
-              );
+              const votes = appealVotes[p.id] ?? {
+                yes: "",
+                no: "",
+                abstain: "",
+              };
               return (
-                <PointRow
+                <li
                   key={p.id}
-                  country={d?.country ?? "Unknown"}
-                  type={p.type}
-                  description={p.description}
-                  timestamp={p.timestamp}
-                  onResolve={() => resolvePoint(p.id)}
-                />
+                  className="rounded border border-purple-100 p-3"
+                >
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span className="font-medium text-purple-900">
+                      {country(p.delegateId)}
+                    </span>
+                    <Badge color="purple">Point of order</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-purple-700">{p.description}</p>
+                  <Input
+                    className="mt-2"
+                    label="Chair ruling"
+                    value={rulingDraft[p.id] ?? p.chairRuling ?? ""}
+                    onChange={(e) =>
+                      setRulingDraft({
+                        ...rulingDraft,
+                        [p.id]: e.target.value,
+                      })
+                    }
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        setPointRuling(
+                          p.id,
+                          rulingDraft[p.id] ?? p.chairRuling ?? ""
+                        )
+                      }
+                    >
+                      Save ruling
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        startAppeal(
+                          p.id,
+                          rulingDraft[p.id] ?? p.chairRuling ?? ""
+                        )
+                      }
+                    >
+                      Appeal ruling
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => resolvePoint(p.id)}
+                    >
+                      Resolve (no appeal)
+                    </Button>
+                  </div>
+                  {p.appealStatus === "pending" && (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                      <Input
+                        label="Yes (overrule)"
+                        value={votes.yes}
+                        onChange={(e) =>
+                          setAppealVotes({
+                            ...appealVotes,
+                            [p.id]: { ...votes, yes: e.target.value },
+                          })
+                        }
+                      />
+                      <Input
+                        label="No (sustain)"
+                        value={votes.no}
+                        onChange={(e) =>
+                          setAppealVotes({
+                            ...appealVotes,
+                            [p.id]: { ...votes, no: e.target.value },
+                          })
+                        }
+                      />
+                      <Input
+                        label="Abstain"
+                        value={votes.abstain}
+                        onChange={(e) =>
+                          setAppealVotes({
+                            ...appealVotes,
+                            [p.id]: { ...votes, abstain: e.target.value },
+                          })
+                        }
+                      />
+                      <div className="flex items-end">
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            resolveAppeal(
+                              p.id,
+                              Number(votes.yes) || 0,
+                              Number(votes.no) || 0,
+                              Number(votes.abstain) || 0
+                            )
+                          }
+                        >
+                          Decide appeal
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </li>
               );
             })}
           </ul>
@@ -100,85 +197,23 @@ export function PointsPanel() {
       )}
 
       {resolved.length > 0 && (
-        <div
-          className={`${
-            unresolved.length > 0
-              ? "mt-4 border-t border-purple-200 pt-4"
-              : "mt-6 border-t border-purple-200 pt-4"
-          }`}
-        >
+        <div className="mt-6 border-t border-purple-200 pt-4">
           <h3 className="mb-3 text-sm font-semibold text-purple-900">
-            Resolved Points
+            Resolved ({resolved.length})
           </h3>
-          <ul className="space-y-2">
-            {resolved.map((p) => {
-              const d = activeCommittee.delegates.find(
-                (x) => x.id === p.delegateId
-              );
-              return (
-                <PointRow
-                  key={p.id}
-                  country={d?.country ?? "Unknown"}
-                  type={p.type}
-                  description={p.description}
-                  timestamp={p.timestamp}
-                  resolved
-                />
-              );
-            })}
+          <ul className="space-y-2 text-sm text-purple-700">
+            {resolved.map((p) => (
+              <li key={p.id}>
+                {country(p.delegateId)}: {p.description}
+                {p.chairRuling ? ` — Ruling: ${p.chairRuling}` : ""}
+                {p.appealStatus && p.appealStatus !== "none"
+                  ? ` — Appeal: ${p.appealStatus}`
+                  : ""}
+              </li>
+            ))}
           </ul>
         </div>
       )}
-
-      {activeCommittee.points.length === 0 && (
-        <p className="mt-6 border-t border-purple-200 pt-4 text-center text-sm text-purple-600">
-          No points logged yet.
-        </p>
-      )}
     </Card>
-  );
-}
-
-function PointRow({
-  country,
-  type,
-  description,
-  timestamp,
-  resolved,
-  onResolve,
-}: {
-  country: string;
-  type: string;
-  description: string;
-  timestamp: string;
-  resolved?: boolean;
-  onResolve?: () => void;
-}) {
-  return (
-    <li
-      className={`rounded border p-3 ${
-        resolved
-          ? "border-gray-200 bg-gray-50 opacity-70"
-          : "border-purple-100 bg-white"
-      }`}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge color="purple">{type}</Badge>
-            <span className="font-medium text-purple-900">{country}</span>
-            <span className="text-xs text-purple-500">
-              {new Date(timestamp).toLocaleString()}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-purple-800">{description}</p>
-        </div>
-        {!resolved && onResolve && (
-          <Button size="sm" variant="secondary" onClick={onResolve}>
-            Resolve
-          </Button>
-        )}
-      </div>
-    </li>
   );
 }

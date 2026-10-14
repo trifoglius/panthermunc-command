@@ -5,7 +5,6 @@ export const PERMISSIONS = [
   "users:manage",
   "committee:access_all",
   "committee:operate",
-  "scoring:edit",
   "notifications:send",
   "export:all",
 ] as const;
@@ -43,10 +42,6 @@ export const PERMISSION_META: Record<
     label: "Operate committee",
     description: "Run roll call, motions, documents, delegates, and points",
   },
-  "scoring:edit": {
-    label: "Edit score sheets",
-    description: "Input and modify awards scoring for committees",
-  },
   "notifications:send": {
     label: "Send notifications",
     description: "Broadcast messages to chairs",
@@ -60,8 +55,8 @@ export const PERMISSION_META: Record<
 export const ROLE_TEMPLATES: Record<Exclude<UserRole, "custom">, Permission[]> =
   {
     admin: ALL_PERMISSIONS,
-    chair: ["committee:operate", "scoring:edit"],
-    registrar: ["committee:access_all", "scoring:edit"],
+    chair: ["committee:operate"],
+    registrar: ["committee:access_all"],
   };
 
 export function permissionsForRole(
@@ -115,17 +110,6 @@ export function canEditCommitteeMetadata(
     canOperateCommittee(session, committeeId)
   );
 }
-
-/** Scoring-related fields a registrar may update without full committee operate access. */
-export const SCORING_DATA_KEYS = [
-  "judgeScores",
-  "daisScores",
-  "positionPaperScores",
-  "vcRecipientId",
-  "discrepancyThreshold",
-] as const;
-
-export type ScoringDataKey = (typeof SCORING_DATA_KEYS)[number];
 
 export function detectRoleFromPermissions(perms: Permission[]): UserRole {
   const normalized = [...perms].sort().join(",");

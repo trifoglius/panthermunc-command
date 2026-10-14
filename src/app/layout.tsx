@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "PantherMUNC Conference Management System",
   description:
-    "Conference management system for PantherMUNC. Handles roll call, motions, documents, scoring, and Excel export.",
+    "Conference management system for PantherMUNC. Handles roll call, motions, documents, and Excel export.",
 };
 
 export default function RootLayout({

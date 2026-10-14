@@ -77,6 +77,16 @@ export function getMotionTypeId(motion: Motion): string | undefined {
   return match?.id;
 }
 
+export function parseMinutes(value?: string): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n * 60 : 0;
+}
+
+export function parseSeconds(value?: string): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 export function getTimerConfig(motion: Motion): MotionTimerConfig | null {
   const typeId = getMotionTypeId(motion);
   if (!typeId) return null;
@@ -91,76 +101,24 @@ export function getTimerConfig(motion: Motion): MotionTimerConfig | null {
         hasSpeakerQueue: true,
         speakingEventType: "moderated_caucus",
       };
-    case "open_speakers_list":
-      return {
-        speakingSeconds: parseSeconds(d.speaking_time),
-        hasSpeakerQueue: true,
-        speakingEventType: "gsl",
-      };
-    case "unmoderated_caucus":
-    case "gentlemans_caucus":
+    case "suspend_meeting":
       return {
         totalSeconds: parseMinutes(d.duration),
         hasSpeakerQueue: false,
-        speakingEventType: "unmoderated_caucus",
+        speakingEventType: "suspension",
       };
-    case "round_robin":
+    case "division_question":
+    case "competence":
       return {
-        speakingSeconds: parseSeconds(d.speaking_time),
+        speakingSeconds: parseSeconds(d.speaking_time) || 60,
         hasSpeakerQueue: true,
-        speakingEventType: "round_robin",
+        queueMode: "for_against",
+        speakingEventType: "procedural_debate",
+        votingSpeakerOrder: "for_first",
       };
-    case "present_draft": {
-      const phases = [
-        {
-          label: "Reading Period",
-          seconds: parseMinutes(d.reading_period),
-          phaseKind: "reading" as const,
-        },
-        {
-          label: "Presentation Period",
-          seconds: parseMinutes(d.presentation_period),
-          phaseKind: "presentation" as const,
-        },
-        {
-          label: "Q&A Period",
-          seconds: parseMinutes(d.qa_period),
-          phaseKind: "qa" as const,
-        },
-      ].filter((p) => p.seconds > 0);
-      if (phases.length === 0) return null;
-      return {
-        phases,
-        hasSpeakerQueue: false,
-        speakingEventType: "presentation",
-      };
-    }
-    case "enter_voting":
-      if (!isAffirmative(d.two_for_two_against)) return null;
-      {
-        const speakingSeconds = parseSeconds(d.speaking_time) || 120;
-        return {
-          totalSeconds: speakingSeconds * 4,
-          speakingSeconds,
-          hasSpeakerQueue: true,
-          queueMode: "for_against",
-          speakingEventType: "voting_procedure",
-          votingSpeakerOrder: parseVotingSpeakerOrder(d.speaker_order),
-        };
-      }
     default:
       return null;
   }
-}
-
-function parseMinutes(value?: string): number {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n * 60 : 0;
-}
-
-function parseSeconds(value?: string): number {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 export function formatTime(seconds: number): string {
@@ -169,19 +127,8 @@ export function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-const FORMAL_SPEAKING_IDS = new Set([
-  "open_speakers_list",
-  "moderated_caucus",
-  "round_robin",
-]);
-
 export function isFormalSpeakingMotion(motion: Motion): boolean {
-  const typeId = getMotionTypeId(motion);
-  if (!typeId) return false;
-  if (typeId === "enter_voting") {
-    return isAffirmative(motion.details.two_for_two_against);
-  }
-  return FORMAL_SPEAKING_IDS.has(typeId);
+  return getMotionTypeId(motion) === "moderated_caucus";
 }
 
 export function motionHasTimer(motion: Motion): boolean {
@@ -189,7 +136,13 @@ export function motionHasTimer(motion: Motion): boolean {
 }
 
 export function motionHasActiveSession(motion: Motion): boolean {
-  return motionHasTimer(motion) || getMotionTypeId(motion) === "enter_voting";
+  const id = getMotionTypeId(motion);
+  return (
+    id === "moderated_caucus" ||
+    id === "division_question" ||
+    id === "competence" ||
+    id === "suspend_meeting"
+  );
 }
 
 export function buildVotingSpeakerQueue(

@@ -1,5 +1,6 @@
 import type { Committee, CommitteeType } from "@/lib/types";
 import type { CommitteeData } from "@/db/schema";
+import { createEmptySessionState, ensureSessionState } from "@/lib/session-state";
 
 export type DbCommitteeRow = {
   id: string;
@@ -17,20 +18,19 @@ export function committeeToData(c: Committee): CommitteeData {
     rollCalls: c.rollCalls,
     motions: c.motions,
     motionQueueHistory: c.motionQueueHistory ?? [],
+    speakerListHistory: c.speakerListHistory ?? [],
     motionSessionState: c.motionSessionState ?? {},
+    sessionState: ensureSessionState(c.sessionState, c.topic),
     documents: c.documents,
     speakingEvents: c.speakingEvents,
     points: c.points,
-    judgeScores: c.judgeScores,
-    daisScores: c.daisScores,
-    positionPaperScores: c.positionPaperScores,
-    vcRecipientId: c.vcRecipientId,
-    discrepancyThreshold: c.discrepancyThreshold,
     requirePositionPapers: c.requirePositionPapers,
+    nextDraftSubmissionOrder: c.nextDraftSubmissionOrder,
   };
 }
 
 export function rowToCommittee(row: DbCommitteeRow): Committee {
+  const data = row.data;
   return {
     id: row.id,
     name: row.name,
@@ -40,7 +40,18 @@ export function rowToCommittee(row: DbCommitteeRow): Committee {
       typeof row.createdAt === "string"
         ? row.createdAt
         : row.createdAt.toISOString(),
-    ...row.data,
+    delegates: data.delegates ?? [],
+    rollCalls: data.rollCalls ?? [],
+    motions: data.motions ?? [],
+    motionQueueHistory: data.motionQueueHistory ?? [],
+    speakerListHistory: data.speakerListHistory ?? [],
+    motionSessionState: data.motionSessionState ?? {},
+    sessionState: ensureSessionState(data.sessionState, row.topic),
+    documents: data.documents ?? [],
+    speakingEvents: data.speakingEvents ?? [],
+    points: data.points ?? [],
+    requirePositionPapers: data.requirePositionPapers ?? false,
+    nextDraftSubmissionOrder: data.nextDraftSubmissionOrder,
   };
 }
 
@@ -64,14 +75,12 @@ export function emptyCommitteeStub(row: {
     rollCalls: [],
     motions: [],
     motionQueueHistory: [],
+    speakerListHistory: [],
     motionSessionState: {},
+    sessionState: createEmptySessionState(row.topic),
     documents: [],
     speakingEvents: [],
     points: [],
-    judgeScores: [],
-    daisScores: [],
-    positionPaperScores: [],
-    discrepancyThreshold: 10,
     requirePositionPapers: false,
   };
 }
@@ -82,14 +91,12 @@ export const COMMITTEE_DATA_KEYS: ReadonlyArray<keyof CommitteeData> = [
   "rollCalls",
   "motions",
   "motionQueueHistory",
+  "speakerListHistory",
   "motionSessionState",
+  "sessionState",
   "documents",
   "speakingEvents",
   "points",
-  "judgeScores",
-  "daisScores",
-  "positionPaperScores",
-  "vcRecipientId",
-  "discrepancyThreshold",
   "requirePositionPapers",
+  "nextDraftSubmissionOrder",
 ];

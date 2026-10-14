@@ -1,24 +1,19 @@
-import type { Permission } from "@/lib/permissions";
-import { hasAnyPermission, hasPermission } from "@/lib/permissions";
+import { hasPermission } from "@/lib/permissions";
 import type { SessionData } from "@/lib/auth-types";
 
 export const WORKSPACE_TABS = [
   { id: "delegates", label: "Delegates", perm: "committee:operate" as const },
-  { id: "rollcall", label: "Roll Call", perm: "committee:operate" as const },
+  { id: "attendance", label: "Attendance", perm: "committee:operate" as const },
+  { id: "speakers", label: "Speakers", perm: "committee:operate" as const },
   { id: "motions", label: "Motions", perm: "committee:operate" as const },
+  { id: "proposals", label: "Proposals", perm: "committee:operate" as const },
+  { id: "voting", label: "Voting", perm: "committee:operate" as const },
   {
-    id: "motion_queues",
-    label: "Motion Queues",
+    id: "history",
+    label: "History",
     perm: "committee:operate" as const,
   },
-  { id: "documents", label: "Documents", perm: "committee:operate" as const },
-  { id: "scoring", label: "Scoring", perm: "scoring:edit" as const },
   { id: "stats", label: "Stats", perm: "committee:operate" as const },
-  {
-    id: "rules",
-    label: "Rules of Procedure",
-    anyOf: ["committee:operate", "scoring:edit"] as Permission[],
-  },
 ] as const;
 
 export type TabId = (typeof WORKSPACE_TABS)[number]["id"];
@@ -29,22 +24,25 @@ export function isValidTabId(value: string): value is TabId {
   return TAB_IDS.includes(value as TabId);
 }
 
+/** Map legacy tab ids from old bookmarks/URLs. */
+export function normalizeTabId(value: string | null): string | null {
+  if (!value) return null;
+  if (value === "rollcall") return "attendance";
+  if (value === "documents") return "proposals";
+  if (value === "motion_queues") return "history";
+  if (value === "rules") return "speakers";
+  if (value === "scoring") return "stats";
+  return value;
+}
+
 export function getVisibleTabs(user: SessionData): TabId[] {
   return WORKSPACE_TABS.filter((tab) =>
-    "perm" in tab
-      ? hasPermission(user, tab.perm)
-      : hasAnyPermission(user, tab.anyOf)
+    hasPermission(user, tab.perm)
   ).map((t) => t.id);
 }
 
-export function getDefaultTab(user: SessionData): TabId {
-  if (
-    hasPermission(user, "scoring:edit") &&
-    !hasPermission(user, "committee:operate")
-  ) {
-    return "scoring";
-  }
-  return "delegates";
+export function getDefaultTab(_user: SessionData): TabId {
+  return "speakers";
 }
 
 export function resolveActiveTab(
@@ -52,8 +50,9 @@ export function resolveActiveTab(
   user: SessionData
 ): TabId {
   const visible = getVisibleTabs(user);
-  if (tabParam && isValidTabId(tabParam) && visible.includes(tabParam)) {
-    return tabParam;
+  const normalized = normalizeTabId(tabParam);
+  if (normalized && isValidTabId(normalized) && visible.includes(normalized)) {
+    return normalized;
   }
   const fallback = getDefaultTab(user);
   return visible.includes(fallback) ? fallback : visible[0] ?? "delegates";

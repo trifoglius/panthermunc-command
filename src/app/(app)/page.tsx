@@ -2,15 +2,15 @@
 
 import { Suspense, useState } from "react";
 import { DelegateManager } from "@/components/delegates/DelegateManager";
-import { DocumentPanel } from "@/components/documents/DocumentPanel";
 import { CommitteePickerCard } from "@/components/layout/AppShell";
 import type { TabId } from "@/components/layout/CommitteeNav";
 import { MotionPanel } from "@/components/motions/MotionPanel";
 import { MotionQueuesPanel } from "@/components/motions/MotionQueuesPanel";
+import { ProposalsPanel } from "@/components/proposals/ProposalsPanel";
 import { RollCallPanel } from "@/components/rollcall/RollCallPanel";
-import { RulesOfProcedurePanel } from "@/components/rules/RulesOfProcedurePanel";
-import { ScoringPanel } from "@/components/scoring/ScoringPanel";
+import { SpeakersPanel } from "@/components/speakers/SpeakersPanel";
 import { StatsPanel } from "@/components/stats/StatsPanel";
+import { VotingPanel } from "@/components/voting/VotingPanel";
 import { Button, Card, Input, Select } from "@/components/ui";
 import { useAuth } from "@/context/AuthContext";
 import { useConference } from "@/context/ConferenceContext";
@@ -19,6 +19,7 @@ import { hasPermission, canAccessAllCommittees } from "@/lib/permissions";
 import type { CommitteeType } from "@/lib/types";
 import { countPresent } from "@/lib/rollcall";
 import { getVoteThresholds } from "@/lib/voting";
+import { ensureSessionState } from "@/lib/session-state";
 
 function AdminSetupScreen() {
   const { conference, initConference, createCommittee } = useConference();
@@ -90,9 +91,9 @@ function AdminSetupScreen() {
               setCommitteeType(e.target.value as CommitteeType)
             }
             options={[
-              { value: "ga", label: "General Assembly (GA Rubric)" },
-              { value: "crisis", label: "Crisis (Crisis Rubric)" },
-              { value: "specialized", label: "Specialized (GA Rubric)" },
+              { value: "ga", label: "General Assembly" },
+              { value: "crisis", label: "Crisis" },
+              { value: "specialized", label: "Specialized" },
             ]}
           />
           <Input
@@ -144,14 +145,19 @@ function CommitteeWorkspace() {
 
   const panels: Record<TabId, React.ReactNode> = {
     delegates: <DelegateManager />,
-    rollcall: <RollCallPanel />,
+    attendance: <RollCallPanel />,
+    speakers: <SpeakersPanel />,
+    proposals: <ProposalsPanel />,
+    voting: <VotingPanel />,
     motions: <MotionPanel />,
-    motion_queues: <MotionQueuesPanel />,
-    documents: <DocumentPanel />,
-    scoring: <ScoringPanel />,
+    history: <MotionQueuesPanel />,
     stats: <StatsPanel />,
-    rules: <RulesOfProcedurePanel />,
   };
+
+  const session = ensureSessionState(
+    activeCommittee.sessionState,
+    activeCommittee.topic
+  );
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-6">
@@ -161,7 +167,11 @@ function CommitteeWorkspace() {
         </h2>
         <p className="text-purple-700">
           {activeCommittee.type.toUpperCase()} ·{" "}
-          {activeCommittee.topic || "No topic set"}
+          {session.agenda.topic || activeCommittee.topic || "No topic set"}
+          {session.agenda.adopted ? " · Agenda adopted" : ""}
+          {session.phase !== "idle"
+            ? ` · ${session.phase.replaceAll("_", " ")}`
+            : ""}
         </p>
         <VoteThresholds committee={activeCommittee} />
       </div>

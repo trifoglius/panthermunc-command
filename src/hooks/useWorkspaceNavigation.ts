@@ -7,6 +7,7 @@ import {
   getDefaultTab,
   getVisibleTabs,
   isValidTabId,
+  normalizeTabId,
   resolveActiveTab,
 } from "@/lib/workspace-url";
 import { useAuth } from "@/context/AuthContext";
@@ -77,17 +78,20 @@ export function useWorkspaceNavigation() {
   useEffect(() => {
     if (loading || !user || pathname !== "/") return;
 
+    const normalizedTab = normalizeTabId(tabParam);
     const needsTab =
-      !tabParam ||
-      !isValidTabId(tabParam) ||
-      !visibleTabs.includes(tabParam as TabId);
+      !normalizedTab ||
+      !isValidTabId(normalizedTab) ||
+      !visibleTabs.includes(normalizedTab);
     const needsCommittee =
       !!activeCommittee && committeeParam !== activeCommittee.id;
+    const needsNormalize =
+      !!tabParam && normalizedTab !== null && tabParam !== normalizedTab;
 
-    if (needsTab || needsCommittee) {
+    if (needsTab || needsCommittee || needsNormalize) {
       replaceUrl({
         committee: committeeParam ?? activeCommittee?.id ?? null,
-        tab: needsTab ? activeTab : (tabParam as TabId),
+        tab: needsTab ? activeTab : (normalizedTab as TabId),
       });
     }
   }, [

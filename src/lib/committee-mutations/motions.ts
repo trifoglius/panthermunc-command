@@ -1,15 +1,13 @@
+import { getMotionTypeId } from "@/lib/motion-timers";
 import {
-  isFormalSpeakingMotion,
-  getMotionTypeId,
-  isAffirmative,
-} from "@/lib/motion-timers";
-import { parseDocumentOrder, aggregateDelegateVotes } from "@/lib/voting";
+  applyPassedMotionEffects,
+  caucusSpeakerListForArchive,
+} from "@/lib/committee-mutations/session";
+import { deriveSessionPhase, ensureSessionState } from "@/lib/session-state";
 import type {
   Committee,
-  DelegatePaperVote,
   Motion,
   MotionQueueSnapshot,
-  PaperVoteRecord,
 } from "@/lib/types";
 
 export function addMotion(committee: Committee, motion: Motion): Committee {
@@ -17,130 +15,36 @@ export function addMotion(committee: Committee, motion: Motion): Committee {
 }
 
 export function updateMotion(committee: Committee, motion: Motion): Committee {
-  return {
+  const previous = committee.motions.find((m) => m.id === motion.id);
+  let next: Committee = {
     ...committee,
     motions: committee.motions.map((m) => (m.id === motion.id ? motion : m)),
   };
+
+  if (motion.status === "passed" && previous?.status !== "passed") {
+    next = applyPassedMotionEffects(next, motion);
+  }
+
+  return next;
 }
 
-export function setMotionSpeakerQueue(
+function resolveModeratedCaucusSpeakers(
   committee: Committee,
-  motionId: string,
-  queue: string[]
-): Committee {
-  return {
-    ...committee,
-    motionSessionState: {
-      ...(committee.motionSessionState ?? {}),
-      [motionId]: {
-        ...(committee.motionSessionState?.[motionId] ?? {}),
-        speakerQueue: queue,
-      },
-    },
-  };
-}
+  passedMotionId: string,
+  typeId: string | undefined
+): string[] | undefined {
+  if (typeId !== "moderated_caucus") return undefined;
 
-export function setMotionVotingSpeakers(
-  committee: Committee,
-  motionId: string,
-  speakersFor: string[],
-  speakersAgainst: string[]
-): Committee {
-  return {
-    ...committee,
-    motionSessionState: {
-      ...(committee.motionSessionState ?? {}),
-      [motionId]: {
-        ...(committee.motionSessionState?.[motionId] ?? {}),
-        speakersFor,
-        speakersAgainst,
-      },
-    },
-  };
-}
+  const caucus = committee.sessionState?.activeCaucus;
+  if (caucus?.motionId === passedMotionId) {
+    const fromActive = caucusSpeakerListForArchive(caucus);
+    if (fromActive.length > 0) return fromActive;
+  }
 
-export function setMotionPaperVotes(
-  committee: Committee,
-  motionId: string,
-  paperVotes: PaperVoteRecord[]
-): Committee {
-  return {
-    ...committee,
-    motionSessionState: {
-      ...(committee.motionSessionState ?? {}),
-      [motionId]: {
-        ...(committee.motionSessionState?.[motionId] ?? {}),
-        paperVotes,
-      },
-    },
-  };
-}
+  const saved = committee.motionSessionState?.[passedMotionId]?.speakerQueue;
+  if (saved && saved.length > 0) return [...saved];
 
-export function setMotionRollCallVote(
-  committee: Committee,
-  motionId: string,
-  documentId: string,
-  delegateId: string,
-  vote: DelegatePaperVote
-): Committee {
-  const motion = committee.motions.find((m) => m.id === motionId);
-  const motionState = committee.motionSessionState?.[motionId] ?? {};
-  const existingRollCall = motionState.rollCallVotes ?? {};
-  const docVotes = {
-    ...(existingRollCall[documentId] ?? {}),
-    [delegateId]: vote,
-  };
-  const rollCallVotes = { ...existingRollCall, [documentId]: docVotes };
-
-  const paperIds = motion ? parseDocumentOrder(motion.details.paper_order) : [];
-  const existingPaperVotes = motionState.paperVotes ?? [];
-  const byId = new Map(existingPaperVotes.map((v) => [v.documentId, v]));
-
-  const paperVotes = paperIds.map((id) => {
-    const delegateVotes = rollCallVotes[id];
-    if (delegateVotes) {
-      return { documentId: id, ...aggregateDelegateVotes(delegateVotes) };
-    }
-    return (
-      byId.get(id) ?? {
-        documentId: id,
-        votesFor: 0,
-        votesAgainst: 0,
-        votesAbstain: 0,
-      }
-    );
-  });
-
-  return {
-    ...committee,
-    motionSessionState: {
-      ...(committee.motionSessionState ?? {}),
-      [motionId]: {
-        ...motionState,
-        rollCallVotes,
-        paperVotes,
-      },
-    },
-  };
-}
-
-export function setMotionPresentationDelegates(
-  committee: Committee,
-  motionId: string,
-  presentationDelegates: string[],
-  qaDelegates: string[]
-): Committee {
-  return {
-    ...committee,
-    motionSessionState: {
-      ...(committee.motionSessionState ?? {}),
-      [motionId]: {
-        ...(committee.motionSessionState?.[motionId] ?? {}),
-        presentationDelegates,
-        qaDelegates,
-      },
-    },
-  };
+  return undefined;
 }
 
 export function archiveMotionQueue(
@@ -151,29 +55,22 @@ export function archiveMotionQueue(
 ): Committee {
   const passedMotion =
     committee.motions.find((m) => m.id === passedMotionId) ?? null;
-  const sessionState = committee.motionSessionState ?? {};
-  const motionState = sessionState[passedMotionId];
-  const isVotingForAgainst =
-    passedMotion &&
-    getMotionTypeId(passedMotion) === "enter_voting" &&
-    isAffirmative(passedMotion.details.two_for_two_against);
-  const speakerQueue =
-    passedMotion && isFormalSpeakingMotion(passedMotion) && !isVotingForAgainst
-      ? motionState?.speakerQueue
-      : undefined;
+  const typeId = passedMotion ? getMotionTypeId(passedMotion) : undefined;
+  const voteCtx = committee.sessionState?.voteContext;
+
+  const speakerQueue = resolveModeratedCaucusSpeakers(
+    committee,
+    passedMotionId,
+    typeId
+  );
+
   const votingSpeakers =
-    passedMotion && isVotingForAgainst
+    (typeId === "division_question" || typeId === "competence") && voteCtx
       ? {
-          for: motionState?.speakersFor ?? [],
-          against: motionState?.speakersAgainst ?? [],
+          for: voteCtx.speakersFor ?? [],
+          against: voteCtx.speakersAgainst ?? [],
         }
       : undefined;
-  const isPresentDraft =
-    passedMotion && getMotionTypeId(passedMotion) === "present_draft";
-  const presentationDelegates = isPresentDraft
-    ? motionState?.presentationDelegates
-    : undefined;
-  const qaDelegates = isPresentDraft ? motionState?.qaDelegates : undefined;
 
   const snapshot: MotionQueueSnapshot = {
     id: snapshotId,
@@ -190,22 +87,39 @@ export function archiveMotionQueue(
       (votingSpeakers.for.length > 0 || votingSpeakers.against.length > 0)
         ? votingSpeakers
         : undefined,
-    presentationDelegates:
-      presentationDelegates && presentationDelegates.length > 0
-        ? presentationDelegates
-        : undefined,
-    qaDelegates:
-      qaDelegates && qaDelegates.length > 0 ? qaDelegates : undefined,
   };
 
-  const archivedIds = new Set(committee.motions.map((m) => m.id));
-  const nextSessionState = { ...sessionState };
-  archivedIds.forEach((id) => delete nextSessionState[id]);
+  let nextSession = committee.sessionState
+    ? ensureSessionState(committee.sessionState, committee.topic)
+    : undefined;
+  if (nextSession?.activeCaucus?.motionId === passedMotionId) {
+    nextSession = {
+      ...nextSession,
+      activeCaucus: undefined,
+    };
+    nextSession = {
+      ...nextSession,
+      phase: deriveSessionPhase(nextSession),
+    };
+  }
+
+  // Keep motionSessionState speaker list for the archived caucus motion as well.
+  let nextMotionSession = committee.motionSessionState ?? {};
+  if (speakerQueue && speakerQueue.length > 0) {
+    nextMotionSession = {
+      ...nextMotionSession,
+      [passedMotionId]: {
+        ...nextMotionSession[passedMotionId],
+        speakerQueue,
+      },
+    };
+  }
 
   return {
     ...committee,
     motions: [],
     motionQueueHistory: [snapshot, ...(committee.motionQueueHistory ?? [])],
-    motionSessionState: nextSessionState,
+    motionSessionState: nextMotionSession,
+    sessionState: nextSession,
   };
 }

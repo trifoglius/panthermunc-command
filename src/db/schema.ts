@@ -15,11 +15,11 @@ import type {
   Motion,
   MotionQueueSnapshot,
   MotionSessionState,
+  CommitteeSessionState,
   Document,
   SpeakingEvent,
   Point,
-  RubricScore,
-  PositionPaperScore,
+  SpeakersListSnapshot,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -30,16 +30,14 @@ export interface CommitteeData {
   rollCalls: RollCallSession[];
   motions: Motion[];
   motionQueueHistory: MotionQueueSnapshot[];
+  speakerListHistory?: SpeakersListSnapshot[];
   motionSessionState: Record<string, MotionSessionState>;
+  sessionState?: CommitteeSessionState;
   documents: Document[];
   speakingEvents: SpeakingEvent[];
   points: Point[];
-  judgeScores: RubricScore[];
-  daisScores: RubricScore[];
-  positionPaperScores: PositionPaperScore[];
-  vcRecipientId?: string;
-  discrepancyThreshold: number;
   requirePositionPapers: boolean;
+  nextDraftSubmissionOrder?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,18 +1,19 @@
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
 import type {
+  Amendment,
   Committee,
   CommitteeType,
   Conference,
   Delegate,
   Document,
+  FloorAllotment,
   Motion,
   Point,
   PositionPaperStatus,
-  PaperVoteRecord,
-  DelegatePaperVote,
   RollCallStatus,
-  ScorerRole,
   SpeakingEvent,
+  VoteContext,
+  VoteMode,
 } from "@/lib/types";
 
 export interface ConferenceContextValue {
@@ -54,44 +55,59 @@ export interface ConferenceContextValue {
   ) => void;
   addMotion: (motion: Omit<Motion, "id" | "timestamp">) => void;
   updateMotion: (motion: Motion) => void;
-  setMotionSpeakerQueue: (motionId: string, queue: string[]) => void;
-  setMotionVotingSpeakers: (
-    motionId: string,
-    speakersFor: string[],
-    speakersAgainst: string[]
-  ) => void;
-  setMotionPaperVotes: (motionId: string, paperVotes: PaperVoteRecord[]) => void;
-  setMotionRollCallVote: (
-    motionId: string,
-    documentId: string,
-    delegateId: string,
-    vote: DelegatePaperVote
-  ) => void;
-  setMotionPresentationDelegates: (
-    motionId: string,
-    presentationDelegates: string[],
-    qaDelegates: string[]
-  ) => void;
+  /** Open Voting procedure for division / competence (2-for-2 then motion vote). */
+  beginProceduralMotionVote: (motion: Motion) => void;
   archiveMotionQueue: (passedMotionId: string) => void;
   addDocument: (doc: Omit<Document, "id" | "amendments">) => void;
   updateDocument: (doc: Document) => void;
   promoteToDraftResolution: (workingPaperId: string) => void;
+  addAmendment: (documentId: string, amendment: Omit<Amendment, "id">) => void;
+  updateAmendment: (documentId: string, amendment: Amendment) => void;
+  addSponsor: (
+    documentId: string,
+    delegateId: string,
+    amendmentId?: string
+  ) => void;
   addSpeakingEvent: (event: Omit<SpeakingEvent, "id" | "timestamp">) => void;
   addPoint: (point: Omit<Point, "id" | "timestamp" | "resolved">) => void;
   resolvePoint: (id: string) => void;
-  updateRubricScore: (
-    role: ScorerRole,
-    delegateId: string,
-    scores: Record<string, number>,
-    notes?: string
+  setPointRuling: (pointId: string, chairRuling: string) => void;
+  startAppeal: (pointId: string, chairRuling: string) => void;
+  resolveAppeal: (
+    pointId: string,
+    votesFor: number,
+    votesAgainst: number,
+    votesAbstain?: number
   ) => void;
-  signScores: (role: ScorerRole) => void;
-  updatePositionPaperScore: (
-    delegateId: string,
-    score: number,
-    notes?: string
+  setAgendaAdopted: (adopted: boolean, topic?: string) => void;
+  setSpeakingTime: (speakingSec: number) => void;
+  setGeneralDebateQueue: (
+    speakerQueue: string[],
+    currentIndex?: number
   ) => void;
-  setVcRecipient: (delegateId: string | undefined) => void;
+  archiveAndClearSpeakersList: () => void;
+  setFloorAllotment: (floorAllotment: FloorAllotment | undefined) => void;
+  setAmendmentPeriod: (
+    documentId: string,
+    totalSec: number,
+    active: boolean,
+    endsAt?: string
+  ) => void;
+  clearAmendmentPeriod: () => void;
+  setCaucusSpeakerQueue: (queue: string[]) => void;
+  advanceCaucusSpeaker: () => void;
+  setCaucusSpeakOrder: (speakOrder: "first" | "last" | undefined) => void;
+  startModeratedCaucus: (motion: Motion) => void;
+  clearActiveCaucus: () => void;
+  clearSuspension: () => void;
+  openVote: (documentId: string, mode?: VoteMode) => void;
+  openAmendmentVote: (
+    documentId: string,
+    amendmentId: string,
+    mode?: VoteMode
+  ) => void;
+  patchVoteContext: (patch: Partial<VoteContext>) => void;
+  clearVoteContext: () => void;
 }
 
 export interface CommitteeSyncEngine {

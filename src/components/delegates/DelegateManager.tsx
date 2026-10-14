@@ -52,7 +52,7 @@ export function DelegateManager() {
 
   return (
     <div className="space-y-4">
-      <Card title="Add Delegate / Country">
+      <Card title="Add Country">
         <div className="grid gap-3 md:grid-cols-4">
           <Input
             label="Country"

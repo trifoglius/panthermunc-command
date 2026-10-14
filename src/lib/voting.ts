@@ -1,12 +1,6 @@
-import type { DelegatePaperVote, Motion, PaperVoteRecord } from "./types";
+import type { DelegatePaperVote, PaperVoteRecord } from "./types";
 
-export const VOTE_BY_ROLL_CALL = "Vote by Roll Call";
-
-export function isVoteByRollCall(motion: Motion): boolean {
-  return motion.details.vote_manner === VOTE_BY_ROLL_CALL;
-}
-
-/** Parse comma-separated document IDs from a motion detail field. */
+/** Parse comma-separated document IDs from a detail field. */
 export function parseDocumentOrder(value?: string): string[] {
   if (!value?.trim()) return [];
   return value
@@ -20,9 +14,7 @@ export function serializeDocumentOrder(ids: string[]): string {
 }
 
 /**
- * Thresholds based on the number of present + present-and-voting delegates,
- * assuming each casts a yes/no vote (no abstentions). Abstentions are excluded
- * when tallying actual paper votes.
+ * Thresholds based on members present (yes/no cast base).
  */
 export function getVoteThresholds(votingBase: number) {
   return {
@@ -31,18 +23,34 @@ export function getVoteThresholds(votingBase: number) {
   };
 }
 
-/** Draft resolutions require a two-thirds majority of votes cast (yes + no). */
-export function draftResolutionPasses(votesFor: number, votesAgainst: number): boolean {
+/** Draft resolutions / important questions: two-thirds of votes cast (yes + no). */
+export function draftResolutionPasses(
+  votesFor: number,
+  votesAgainst: number
+): boolean {
   const votesCast = votesFor + votesAgainst;
   if (votesCast === 0) return false;
   const required = Math.ceil((votesCast * 2) / 3);
   return votesFor >= required;
 }
 
-export function requiredYesForSupermajority(votesFor: number, votesAgainst: number): number {
+export function requiredYesForSupermajority(
+  votesFor: number,
+  votesAgainst: number
+): number {
   const votesCast = votesFor + votesAgainst;
   if (votesCast === 0) return 0;
   return Math.ceil((votesCast * 2) / 3);
+}
+
+/** Simple majority of members present and voting (yes vs no). */
+export function simpleMajorityPasses(
+  votesFor: number,
+  votesAgainst: number
+): boolean {
+  const cast = votesFor + votesAgainst;
+  if (cast === 0) return false;
+  return votesFor > votesAgainst;
 }
 
 export function aggregateDelegateVotes(

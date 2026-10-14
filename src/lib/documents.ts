@@ -1,4 +1,13 @@
-import type { Committee, Document, DocumentStatus } from "./types";
+import type { Amendment, Committee, Document, DocumentStatus } from "./types";
+
+/** Normalized change clauses, including legacy single `clause` field. */
+export function getAmendmentClauses(amendment: Amendment): string[] {
+  if (amendment.clauses?.length) {
+    return amendment.clauses.map((c) => c.trim()).filter(Boolean);
+  }
+  if (amendment.clause?.trim()) return [amendment.clause.trim()];
+  return [];
+}
 
 export function getDocumentTypeLabel(doc: Document): string {
   if (doc.type === "working_paper") return "Working Paper";
@@ -10,7 +19,7 @@ export function getStatusBadgeColor(
   status: DocumentStatus
 ): "green" | "red" | "gray" {
   if (status === "adopted") return "green";
-  if (status === "failed") return "red";
+  if (status === "failed" || status === "withdrawn") return "red";
   return "gray";
 }
 
@@ -19,7 +28,8 @@ export function isActiveDraftResolution(doc: Document): boolean {
   return (
     doc.type === "draft_resolution" &&
     doc.status !== "adopted" &&
-    doc.status !== "failed"
+    doc.status !== "failed" &&
+    doc.status !== "withdrawn"
   );
 }
 

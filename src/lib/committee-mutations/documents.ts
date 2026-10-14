@@ -2,7 +2,7 @@ import {
   assignSubmissionNumber,
   normalizeDocumentUpdate,
 } from "@/lib/documents";
-import type { Committee, Document } from "@/lib/types";
+import type { Amendment, Committee, Document } from "@/lib/types";
 
 export function addDocument(committee: Committee, doc: Document): Committee {
   const { committee: withOrder, doc: withSubmission } = assignSubmissionNumber(
@@ -50,5 +50,67 @@ export function promoteToDraftResolution(
     documents: withOrder.documents.map((d) =>
       d.id === workingPaperId ? withSubmission : d
     ),
+  };
+}
+
+export function addAmendment(
+  committee: Committee,
+  documentId: string,
+  amendment: Amendment
+): Committee {
+  return {
+    ...committee,
+    documents: committee.documents.map((doc) =>
+      doc.id === documentId
+        ? { ...doc, amendments: [...doc.amendments, amendment] }
+        : doc
+    ),
+  };
+}
+
+export function updateAmendment(
+  committee: Committee,
+  documentId: string,
+  amendment: Amendment
+): Committee {
+  return {
+    ...committee,
+    documents: committee.documents.map((doc) =>
+      doc.id === documentId
+        ? {
+            ...doc,
+            amendments: doc.amendments.map((a) =>
+              a.id === amendment.id ? amendment : a
+            ),
+          }
+        : doc
+    ),
+  };
+}
+
+export function addSponsor(
+  committee: Committee,
+  documentId: string,
+  delegateId: string,
+  amendmentId?: string
+): Committee {
+  return {
+    ...committee,
+    documents: committee.documents.map((doc) => {
+      if (doc.id !== documentId) return doc;
+      if (amendmentId) {
+        return {
+          ...doc,
+          amendments: doc.amendments.map((a) => {
+            if (a.id !== amendmentId) return a;
+            const sponsors = a.sponsors ?? [];
+            if (sponsors.includes(delegateId)) return a;
+            return { ...a, sponsors: [...sponsors, delegateId] };
+          }),
+        };
+      }
+      if (doc.sponsors.includes(delegateId)) return doc;
+      return { ...doc, sponsors: [...doc.sponsors, delegateId] };
+    }),
   };
 }
