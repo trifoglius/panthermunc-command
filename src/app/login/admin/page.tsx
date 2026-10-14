@@ -88,10 +88,6 @@ export default function AdminBootstrapPage() {
             autoFocus
             placeholder="Required to initialize system"
           />
-          <p className="-mt-2 text-xs text-neutral-400">
-            Only conference admins with the bootstrap password can initialize
-            or recover the system.
-          </p>
           {error && (
             <p className="text-sm text-red-400" role="alert">
               {error}
