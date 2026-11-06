@@ -96,7 +96,6 @@ export interface ConferenceContextValue {
   clearAmendmentPeriod: () => void;
   setCaucusSpeakerQueue: (queue: string[]) => void;
   advanceCaucusSpeaker: () => void;
-  setCaucusSpeakOrder: (speakOrder: "first" | "last" | undefined) => void;
   startModeratedCaucus: (motion: Motion) => void;
   clearActiveCaucus: () => void;
   clearSuspension: () => void;

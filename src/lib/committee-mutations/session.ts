@@ -1,6 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
 import {
-  applySpeakOrderReserve,
   getMotionTypeId,
   parseMinutes,
   parseSeconds,
@@ -258,37 +257,6 @@ export function advanceCaucusSpeaker(committee: Committee): Committee {
   );
 }
 
-export function setCaucusSpeakOrder(
-  committee: Committee,
-  speakOrder: "first" | "last" | undefined
-): Committee {
-  const withSessionState = withSession(committee, (s) => {
-    if (!s.activeCaucus) return s;
-    const caucus = s.activeCaucus;
-    const speakerQueue = applySpeakOrderReserve(
-      caucus.speakerQueue,
-      caucus.proposedBy,
-      speakOrder,
-      0
-    );
-    return {
-      ...s,
-      activeCaucus: {
-        ...caucus,
-        speakOrder,
-        speakerQueue,
-      },
-    };
-  });
-  const caucus = withSessionState.sessionState?.activeCaucus;
-  if (!caucus) return withSessionState;
-  return withCaucusSpeakerPersistence(
-    withSessionState,
-    caucus.motionId,
-    caucusSpeakerListForArchive(caucus)
-  );
-}
-
 /** End caucus, persisting the full speaker list onto the motion for later archive. */
 export function clearActiveCaucus(committee: Committee): Committee {
   const session = ensureSessionState(committee.sessionState, committee.topic);
@@ -394,7 +362,7 @@ export function applyPassedMotionEffects(
 
   switch (typeId) {
     case "moderated_caucus": {
-      // Speaker list + first/last reserve are set after the motion passes.
+      // Speaker list is set after the motion passes.
       next = setActiveCaucus(next, {
         motionId: motion.id,
         topic: d.topic ?? "",

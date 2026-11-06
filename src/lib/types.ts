@@ -71,7 +71,7 @@ export interface Motion {
 export interface Amendment {
   id: string;
   title?: string;
-  /** Change clauses / operatives (list supports division of the question). */
+  /** Optional stored change text from older sessions. */
   clauses?: string[];
   /** @deprecated Prefer `clauses`. Kept for older saved sessions. */
   clause?: string;
@@ -244,6 +244,7 @@ export interface ActiveCaucus {
   /** Speakers who already spoke (advanced off the queue), in order. */
   completedSpeakers?: string[];
   proposedBy: string;
+  /** @deprecated Unused. Older sessions may still store a first/last reserve. */
   speakOrder?: "first" | "last";
   startedAt?: string;
 }

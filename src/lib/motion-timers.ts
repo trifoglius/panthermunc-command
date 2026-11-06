@@ -36,41 +36,6 @@ export function parseVotingSpeakerOrder(value?: string): VotingSpeakerOrder {
   return "for_first";
 }
 
-export function applySpeakOrderReserve(
-  queue: string[],
-  proposedBy: string,
-  speakOrder?: string,
-  completedCount = 0
-): string[] {
-  if (!speakOrder || !proposedBy) return queue;
-  const completed = queue.slice(0, completedCount);
-  const pending = queue.slice(completedCount);
-  const pendingUnique = pending.filter(
-    (id, index) => pending.indexOf(id) === index
-  );
-  const others = pendingUnique.filter((id) => id !== proposedBy);
-  let reordered: string[];
-  if (speakOrder === "first") reordered = [proposedBy, ...others];
-  else if (speakOrder === "last") reordered = [...others, proposedBy];
-  else reordered = pendingUnique;
-  return [...completed, ...reordered];
-}
-
-export function addSpeakerWithReserve(
-  queue: string[],
-  speakerId: string,
-  proposedBy: string,
-  speakOrder?: string,
-  completedCount = 0
-): string[] {
-  return applySpeakOrderReserve(
-    [...queue, speakerId],
-    proposedBy,
-    speakOrder,
-    completedCount
-  );
-}
-
 export function getMotionTypeId(motion: Motion): string | undefined {
   if (motion.motionTypeId) return motion.motionTypeId;
   const match = MOTION_TYPES.find((m) => m.label === motion.type);

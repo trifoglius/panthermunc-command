@@ -6,13 +6,10 @@ import { PointsPanel } from "@/components/points/PointsPanel";
 import { TimerDisplay } from "@/components/motions/TimerControls";
 import { MOTION_TYPES } from "@/lib/constants";
 import { isActiveDraftResolution } from "@/lib/documents";
-import {
-  addSpeakerWithReserve,
-  getMotionTypeId,
-  getTimerConfig,
-} from "@/lib/motion-timers";
+import { getMotionTypeId, getTimerConfig } from "@/lib/motion-timers";
 import { proceduralMotionPasses } from "@/lib/session-state";
 import { useSessionTimers } from "@/hooks/useSessionTimers";
+import { useWorkspaceNavigation } from "@/hooks/useWorkspaceNavigation";
 import type { MotionField } from "@/lib/constants";
 import { Badge, Button, Card, Input, Select, Tabs, Textarea } from "@/components/ui";
 import type { Motion, MotionStatus } from "@/lib/types";
@@ -44,6 +41,7 @@ export function MotionPanel() {
     beginProceduralMotionVote,
     archiveMotionQueue,
   } = useConference();
+  const { setActiveTab } = useWorkspaceNavigation();
   const [motionType, setMotionType] = useState<string>(MOTION_TYPES[0].id);
   const [proposedBy, setProposedBy] = useState("");
   const [details, setDetails] = useState<Record<string, string>>({});
@@ -238,9 +236,10 @@ export function MotionPanel() {
                     motion={motion}
                     proposer={country(motion.proposedBy)}
                     onUpdate={updateMotion}
-                    onBeginProceduralVote={() =>
-                      beginProceduralMotionVote(motion)
-                    }
+                    onBeginProceduralVote={() => {
+                      beginProceduralMotionVote(motion);
+                      setActiveTab("voting");
+                    }}
                     onArchive={() => archiveMotionQueue(motion.id)}
                   />
                 ))}
@@ -367,9 +366,11 @@ function MotionRow({
             {proceduralVoteOpen && (
               <Badge color="purple">Open in Voting tab</Badge>
             )}
-            {(motion.status === "passed" || motion.status === "failed") && (
+            {(motion.status === "passed" ||
+              motion.status === "failed" ||
+              proceduralVoteOpen) && (
               <Button size="sm" variant="secondary" onClick={onArchive}>
-                Archive log after this motion
+                End motion and archive log
               </Button>
             )}
           </div>
@@ -459,7 +460,7 @@ function MotionRow({
                 </Button>
               )}
               <Button size="sm" variant="secondary" onClick={onArchive}>
-                Archive log after this motion
+                End motion and archive log
               </Button>
             </div>
           )}
@@ -484,7 +485,6 @@ function ModeratedCaucusSession({ motion }: { motion: Motion }) {
     activeCommittee,
     setCaucusSpeakerQueue,
     advanceCaucusSpeaker,
-    setCaucusSpeakOrder,
     clearActiveCaucus,
     addSpeakingEvent,
   } = useConference();
@@ -504,15 +504,8 @@ function ModeratedCaucusSession({ motion }: { motion: Motion }) {
     activeCommittee.delegates.find((d) => d.id === id)?.country ?? id;
 
   const addSpeaker = () => {
-    if (!addId) return;
-    const next = addSpeakerWithReserve(
-      caucus.speakerQueue,
-      addId,
-      caucus.proposedBy,
-      caucus.speakOrder,
-      0
-    );
-    setCaucusSpeakerQueue(next);
+    if (!addId || caucus.speakerQueue.includes(addId)) return;
+    setCaucusSpeakerQueue([...caucus.speakerQueue, addId]);
     setAddId("");
   };
 
@@ -551,23 +544,6 @@ function ModeratedCaucusSession({ motion }: { motion: Motion }) {
 
       {sessionOpen && (
         <div className="space-y-3">
-          <Select
-            label="Proposer speaks"
-            value={caucus.speakOrder ?? "none"}
-            onChange={(e) => {
-              const value = e.target.value;
-              setCaucusSpeakOrder(
-                value === "first" || value === "last" ? value : undefined
-              );
-            }}
-            options={[
-              { value: "none", label: "No reserve" },
-              { value: "first", label: "First" },
-              { value: "last", label: "Last" },
-            ]}
-            className="max-w-xs"
-          />
-
           <div className="flex flex-wrap items-end gap-2">
             <Select
               label="Add speaker"
@@ -601,9 +577,6 @@ function ModeratedCaucusSession({ motion }: { motion: Motion }) {
                   <span className="font-medium text-purple-900">
                     {country(id)}
                   </span>
-                  {id === caucus.proposedBy && caucus.speakOrder ? (
-                    <Badge color="purple">Reserved {caucus.speakOrder}</Badge>
-                  ) : null}
                   <div className="ml-auto flex flex-wrap gap-1">
                     <Button
                       size="sm"

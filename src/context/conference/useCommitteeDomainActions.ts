@@ -393,16 +393,6 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     patchCommittee(cid, (c) => sessionMutations.advanceCaucusSpeaker(c));
   }, [patchCommittee, requireCommittee]);
 
-  const setCaucusSpeakOrder = useCallback(
-    (speakOrder: "first" | "last" | undefined) => {
-      const cid = requireCommittee();
-      patchCommittee(cid, (c) =>
-        sessionMutations.setCaucusSpeakOrder(c, speakOrder)
-      );
-    },
-    [patchCommittee, requireCommittee]
-  );
-
   const startModeratedCaucus = useCallback(
     (motion: Motion) => {
       const cid = requireCommittee();
@@ -505,7 +495,6 @@ export function useCommitteeDomainActions(sync: CommitteeSyncEngine) {
     clearAmendmentPeriod,
     setCaucusSpeakerQueue,
     advanceCaucusSpeaker,
-    setCaucusSpeakOrder,
     startModeratedCaucus,
     clearActiveCaucus,
     clearSuspension,

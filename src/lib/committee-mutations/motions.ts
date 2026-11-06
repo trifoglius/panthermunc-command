@@ -2,8 +2,10 @@ import { getMotionTypeId } from "@/lib/motion-timers";
 import {
   applyPassedMotionEffects,
   caucusSpeakerListForArchive,
+  clearActiveCaucus,
+  clearSuspension,
+  clearVoteContext,
 } from "@/lib/committee-mutations/session";
-import { deriveSessionPhase, ensureSessionState } from "@/lib/session-state";
 import type {
   Committee,
   Motion,
@@ -56,7 +58,6 @@ export function archiveMotionQueue(
   const passedMotion =
     committee.motions.find((m) => m.id === passedMotionId) ?? null;
   const typeId = passedMotion ? getMotionTypeId(passedMotion) : undefined;
-  const voteCtx = committee.sessionState?.voteContext;
 
   const speakerQueue = resolveModeratedCaucusSpeakers(
     committee,
@@ -64,18 +65,16 @@ export function archiveMotionQueue(
     typeId
   );
 
-  const votingSpeakers =
-    (typeId === "division_question" || typeId === "competence") && voteCtx
-      ? {
-          for: voteCtx.speakersFor ?? [],
-          against: voteCtx.speakersAgainst ?? [],
-        }
-      : undefined;
+  const votingSpeakers = votingSpeakersForArchive(
+    committee,
+    passedMotionId,
+    typeId
+  );
 
   const snapshot: MotionQueueSnapshot = {
     id: snapshotId,
     label: passedMotion
-      ? `After: ${passedMotion.type}`
+      ? `Ended: ${passedMotion.type}`
       : `Queue ${(committee.motionQueueHistory?.length ?? 0) + 1}`,
     savedAt,
     passedMotion,
@@ -89,37 +88,79 @@ export function archiveMotionQueue(
         : undefined,
   };
 
-  let nextSession = committee.sessionState
-    ? ensureSessionState(committee.sessionState, committee.topic)
-    : undefined;
-  if (nextSession?.activeCaucus?.motionId === passedMotionId) {
-    nextSession = {
-      ...nextSession,
-      activeCaucus: undefined,
-    };
-    nextSession = {
-      ...nextSession,
-      phase: deriveSessionPhase(nextSession),
-    };
-  }
+  const ended = endMotionSession(committee, passedMotion, speakerQueue);
 
-  // Keep motionSessionState speaker list for the archived caucus motion as well.
-  let nextMotionSession = committee.motionSessionState ?? {};
+  return {
+    ...ended,
+    motions: [],
+    motionQueueHistory: [snapshot, ...(committee.motionQueueHistory ?? [])],
+  };
+}
+
+function votingSpeakersForArchive(
+  committee: Committee,
+  passedMotionId: string,
+  typeId: string | undefined
+): { for: string[]; against: string[] } | undefined {
+  if (typeId !== "division_question" && typeId !== "competence") {
+    return undefined;
+  }
+  const voteCtx = committee.sessionState?.voteContext;
+  if (!voteCtx) return undefined;
+  if (
+    voteCtx.target.type !== "division" &&
+    voteCtx.target.type !== "competence"
+  ) {
+    return undefined;
+  }
+  if (voteCtx.target.id !== passedMotionId) return undefined;
+  return {
+    for: voteCtx.speakersFor ?? [],
+    against: voteCtx.speakersAgainst ?? [],
+  };
+}
+
+/** Stop the live procedure for this motion, then the caller files the log. */
+function endMotionSession(
+  committee: Committee,
+  motion: Motion | null,
+  speakerQueue: string[] | undefined
+): Committee {
+  if (!motion) return committee;
+
+  const typeId = getMotionTypeId(motion);
+  let next = committee;
+
   if (speakerQueue && speakerQueue.length > 0) {
-    nextMotionSession = {
-      ...nextMotionSession,
-      [passedMotionId]: {
-        ...nextMotionSession[passedMotionId],
-        speakerQueue,
+    const prev = next.motionSessionState?.[motion.id] ?? {};
+    next = {
+      ...next,
+      motionSessionState: {
+        ...(next.motionSessionState ?? {}),
+        [motion.id]: {
+          ...prev,
+          speakerQueue,
+        },
       },
     };
   }
 
-  return {
-    ...committee,
-    motions: [],
-    motionQueueHistory: [snapshot, ...(committee.motionQueueHistory ?? [])],
-    motionSessionState: nextMotionSession,
-    sessionState: nextSession,
-  };
+  if (next.sessionState?.activeCaucus?.motionId === motion.id) {
+    next = clearActiveCaucus(next);
+  }
+
+  if (typeId === "suspend_meeting" && next.sessionState?.suspension?.active) {
+    next = clearSuspension(next);
+  }
+
+  const vote = next.sessionState?.voteContext;
+  if (
+    vote &&
+    (vote.target.type === "division" || vote.target.type === "competence") &&
+    vote.target.id === motion.id
+  ) {
+    next = clearVoteContext(next);
+  }
+
+  return next;
 }

@@ -5,6 +5,7 @@ import { useConference } from "@/context/ConferenceContext";
 import { DelegateMultiSelect } from "@/components/delegates/DelegateMultiSelect";
 import { TimerCard } from "@/components/motions/TimerControls";
 import { useCountdown } from "@/hooks/useCountdown";
+import { useWorkspaceNavigation } from "@/hooks/useWorkspaceNavigation";
 import {
   getAmendmentClauses,
   getDocumentTypeLabel,
@@ -32,6 +33,7 @@ export function ProposalsPanel() {
     openAmendmentVote,
     addSpeakingEvent,
   } = useConference();
+  const { setActiveTab } = useWorkspaceNavigation();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -42,7 +44,6 @@ export function ProposalsPanel() {
   const [introSeconds, setIntroSeconds] = useState("180");
   const [amendDocId, setAmendDocId] = useState("");
   const [amendTitle, setAmendTitle] = useState("");
-  const [amendClauses, setAmendClauses] = useState<string[]>([""]);
   const [amendLink, setAmendLink] = useState("");
   const [amendSponsors, setAmendSponsors] = useState<string[]>([]);
   const [amendPeriodMin, setAmendPeriodMin] = useState("15");
@@ -127,11 +128,9 @@ export function ProposalsPanel() {
   };
 
   const createAmendment = () => {
-    const clauses = amendClauses.map((c) => c.trim()).filter(Boolean);
-    if (!amendDocId || !amendTitle.trim() || clauses.length === 0) return;
+    if (!amendDocId || !amendTitle.trim()) return;
     addAmendment(amendDocId, {
       title: amendTitle.trim(),
-      clauses,
       link: amendLink.trim() || undefined,
       amendmentType: "unfriendly",
       status: "submitted",
@@ -140,23 +139,8 @@ export function ProposalsPanel() {
       submittedAt: new Date().toISOString(),
     });
     setAmendTitle("");
-    setAmendClauses([""]);
     setAmendLink("");
     setAmendSponsors([]);
-  };
-
-  const updateAmendClause = (index: number, value: string) => {
-    setAmendClauses((prev) => prev.map((c, i) => (i === index ? value : c)));
-  };
-
-  const addAmendClauseRow = () => {
-    setAmendClauses((prev) => [...prev, ""]);
-  };
-
-  const removeAmendClauseRow = (index: number) => {
-    setAmendClauses((prev) =>
-      prev.length <= 1 ? [""] : prev.filter((_, i) => i !== index)
-    );
   };
 
   const ordered = getDocumentsBySubmissionOrder(activeCommittee);
@@ -337,6 +321,7 @@ export function ProposalsPanel() {
                             return;
                           }
                           openVote(doc.id, "recorded");
+                          setActiveTab("voting");
                         }}
                       >
                         Open vote
@@ -517,9 +502,10 @@ export function ProposalsPanel() {
                               </Button>
                               <Button
                                 size="sm"
-                                onClick={() =>
-                                  openAmendmentVote(doc.id, a.id, "recorded")
-                                }
+                                onClick={() => {
+                                  openAmendmentVote(doc.id, a.id, "recorded");
+                                  setActiveTab("voting");
+                                }}
                               >
                                 Open vote
                               </Button>
@@ -572,47 +558,6 @@ export function ProposalsPanel() {
             placeholder="https://..."
           />
         </div>
-        <div className="mt-3 space-y-2">
-          <p className="text-sm font-medium text-purple-900">
-            Change clauses / operatives
-          </p>
-          <p className="text-xs text-purple-600">
-            List each change separately so division of the question can use these
-            as parts.
-          </p>
-          {amendClauses.map((clause, index) => (
-            <div key={`amend-clause-${index}`} className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <Input
-                  label=""
-                  aria-label={`Change clause ${index + 1}`}
-                  value={clause}
-                  onChange={(e) => updateAmendClause(index, e.target.value)}
-                  placeholder={`Clause / operative ${index + 1}`}
-                />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => removeAmendClauseRow(index)}
-                  disabled={amendClauses.length <= 1}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          ))}
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={addAmendClauseRow}
-          >
-            Add clause
-          </Button>
-        </div>
         <DelegateMultiSelect
           label="Sponsors"
           delegates={activeCommittee.delegates}
@@ -622,11 +567,7 @@ export function ProposalsPanel() {
         <div className="mt-3">
           <Button
             onClick={createAmendment}
-            disabled={
-              !amendDocId ||
-              !amendTitle.trim() ||
-              !amendClauses.some((c) => c.trim())
-            }
+            disabled={!amendDocId || !amendTitle.trim()}
           >
             Submit amendment
           </Button>

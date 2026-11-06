@@ -5,7 +5,6 @@ import { useConference } from "@/context/ConferenceContext";
 import { TimerCard } from "@/components/motions/TimerControls";
 import { useCountdown } from "@/hooks/useCountdown";
 import { ensureSessionState, speakingSeconds } from "@/lib/session-state";
-import { addSpeakerWithReserve } from "@/lib/motion-timers";
 import { Badge, Button, Card, Input, Select } from "@/components/ui";
 
 export function SpeakersPanel() {
@@ -18,7 +17,6 @@ export function SpeakersPanel() {
     setFloorAllotment,
     setCaucusSpeakerQueue,
     advanceCaucusSpeaker,
-    setCaucusSpeakOrder,
     clearActiveCaucus,
     clearSuspension,
     addSpeakingEvent,
@@ -144,15 +142,10 @@ export function SpeakersPanel() {
   };
 
   const addToCaucus = () => {
-    if (!caucus || !caucusAddId) return;
-    const next = addSpeakerWithReserve(
-      caucus.speakerQueue,
-      caucusAddId,
-      caucus.proposedBy,
-      caucus.speakOrder,
-      0
-    );
-    setCaucusSpeakerQueue(next);
+    if (!caucus || !caucusAddId || caucus.speakerQueue.includes(caucusAddId)) {
+      return;
+    }
+    setCaucusSpeakerQueue([...caucus.speakerQueue, caucusAddId]);
     setCaucusAddId("");
   };
 
@@ -436,23 +429,6 @@ export function SpeakersPanel() {
               End caucus
             </Button>
           </div>
-          <div className="mb-3 max-w-xs">
-            <Select
-              label="Proposer speaks"
-              value={caucus.speakOrder ?? "none"}
-              onChange={(e) => {
-                const value = e.target.value;
-                setCaucusSpeakOrder(
-                  value === "first" || value === "last" ? value : undefined
-                );
-              }}
-              options={[
-                { value: "none", label: "No reserve" },
-                { value: "first", label: "First" },
-                { value: "last", label: "Last" },
-              ]}
-            />
-          </div>
           <div className="mb-4 grid gap-3 md:grid-cols-2">
             <TimerCard
               label="Caucus total"
@@ -495,9 +471,6 @@ export function SpeakersPanel() {
             {caucus.speakerQueue.map((id, i) => (
               <li key={`${id}-${i}`} className="text-purple-900">
                 {i + 1}. {country(id)}
-                {id === caucus.proposedBy && caucus.speakOrder
-                  ? ` (reserved ${caucus.speakOrder})`
-                  : ""}
               </li>
             ))}
           </ol>

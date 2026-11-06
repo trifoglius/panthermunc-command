@@ -6,22 +6,12 @@ import { TimerCard } from "@/components/motions/TimerControls";
 import { useCountdown } from "@/hooks/useCountdown";
 import { VOTE_MODES } from "@/lib/constants";
 import {
-  aggregateDelegateVotes,
   draftResolutionPasses,
   simpleMajorityPasses,
 } from "@/lib/voting";
 import { ensureSessionState, normalizeVoteMode } from "@/lib/session-state";
-import {
-  getLatestRollCall,
-  getRollCallVotingDelegates,
-} from "@/lib/rollcall";
 import { Badge, Button, Card, Input, Select } from "@/components/ui";
-import type {
-  DelegatePaperVote,
-  DivisionPartStatus,
-  MotionStatus,
-  VoteMode,
-} from "@/lib/types";
+import type { DivisionPartStatus, MotionStatus, VoteMode } from "@/lib/types";
 
 function voteTargetLabel(type: string): string {
   switch (type) {
@@ -126,11 +116,6 @@ export function VotingPanel() {
     ...(targetAmendment?.sponsors ?? []),
   ]);
 
-  const rollCall = getLatestRollCall(activeCommittee);
-  const votingDelegates = rollCall
-    ? getRollCallVotingDelegates(activeCommittee, rollCall)
-    : activeCommittee.delegates;
-
   const yes = vote.tallies?.yes ?? 0;
   const no = vote.tallies?.no ?? 0;
   const abstain = vote.tallies?.abstain ?? 0;
@@ -227,19 +212,6 @@ export function VotingPanel() {
     });
     setFloorAllotment(undefined);
     floorTimer.pause();
-  };
-
-  const setRecorded = (delegateId: string, value: DelegatePaperVote) => {
-    const recordedVotes = { ...(vote.recordedVotes ?? {}), [delegateId]: value };
-    const tallies = aggregateDelegateVotes(recordedVotes);
-    patchVoteContext({
-      recordedVotes,
-      tallies: {
-        yes: tallies.votesFor,
-        no: tallies.votesAgainst,
-        abstain: tallies.votesAbstain,
-      },
-    });
   };
 
   const applyProposalResult = (passed: boolean) => {
@@ -783,39 +755,6 @@ export function VotingPanel() {
             />
           </div>
 
-          <p className="mb-2 mt-6 text-sm font-medium text-purple-800">
-            By delegation
-          </p>
-          <div className="space-y-2">
-            {votingDelegates.map((d) => {
-              const v = vote.recordedVotes?.[d.id];
-              return (
-                <div
-                  key={d.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-purple-50 p-2"
-                >
-                  <span className="font-medium text-purple-900">
-                    {d.country}
-                  </span>
-                  <div className="flex gap-1">
-                    {(["yes", "no", "abstain"] as const).map((opt) => (
-                      <Button
-                        key={opt}
-                        size="sm"
-                        variant={v === opt ? "primary" : "secondary"}
-                        onClick={() => {
-                          patchVoteContext({ votingStarted: true });
-                          setRecorded(d.id, opt);
-                        }}
-                      >
-                        {opt}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
           <p className="mt-3 text-sm text-purple-700">
             Yes {yes} · No {no} · Abstain {abstain}
           </p>

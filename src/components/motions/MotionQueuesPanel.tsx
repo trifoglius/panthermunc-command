@@ -49,8 +49,8 @@ export function MotionQueuesPanel() {
       {history.length === 0 ? (
         <Card title="Motion history">
           <p className="text-sm text-purple-600">
-            No archived motion logs yet. After a motion passes, use &quot;Archive
-            log after this motion&quot; on the Motions tab.
+            No archived motion logs yet. Use &quot;End motion and archive log&quot;
+            on the Motions tab to finish a motion and file its log.
           </p>
         </Card>
       ) : (
@@ -112,8 +112,13 @@ function SnapshotCard({
 
       {snapshot.passedMotion && (
         <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3">
-          <p className="text-sm font-medium text-green-900">Passed motion</p>
-          <p className="text-sm text-green-800">{snapshot.passedMotion.type}</p>
+          <p className="text-sm font-medium text-green-900">Ended motion</p>
+          <p className="text-sm text-green-800">
+            {snapshot.passedMotion.type}
+            {snapshot.passedMotion.status
+              ? ` · ${snapshot.passedMotion.status}`
+              : ""}
+          </p>
         </div>
       )}
 
